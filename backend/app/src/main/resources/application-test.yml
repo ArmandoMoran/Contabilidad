@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/contabilidad_test
+    username: contabilidad
+    password: contabilidad_dev
+  flyway:
+    clean-disabled: false
+
+app:
+  sat:
+    mode: simulated
+  pac:
+    mode: simulated

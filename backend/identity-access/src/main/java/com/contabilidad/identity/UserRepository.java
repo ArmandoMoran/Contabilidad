@@ -1,0 +1,11 @@
+package com.contabilidad.identity;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface UserRepository extends JpaRepository<User, UUID> {
+    Optional<User> findByCompanyIdAndEmail(UUID companyId, String email);
+    Optional<User> findByEmail(String email);
+    boolean existsByCompanyIdAndEmail(UUID companyId, String email);
+}

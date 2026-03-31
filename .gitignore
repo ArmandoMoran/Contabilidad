@@ -3,22 +3,44 @@
 .idea/
 *.swp
 *.swo
+*.iml
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Dependencies
-node_modules/
-__pycache__/
-*.pyc
+# Java / Maven
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.pnpm-store/
+.vite/
+
+# Environment
 .env
 .env.local
+.env.*.local
 
-# Build outputs
-dist/
-build/
-out/
+# Docker volumes
+infra/compose/data/
 
-# Misc
+# Logs
 *.log
+logs/
+
+# Test output
+backend/**/test-results/
+frontend/coverage/
+e2e/test-results/
+e2e/playwright-report/
+
+# Generated
+openapi/generated/

@@ -1,0 +1,1527 @@
+openapi: 3.1.0
+info:
+  title: Contabilidad API
+  description: |
+    API REST para el sistema de contabilidad y facturación electrónica.
+    Soporta CFDI 4.0, REP 2.0, catálogos SAT versionados, motor fiscal configurable
+    y preparación para contabilidad electrónica.
+  version: 0.1.0
+  contact:
+    name: Contabilidad Team
+
+servers:
+  - url: http://localhost:8080
+    description: Desarrollo local
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+    description: Autenticación y gestión de sesión
+  - name: Companies
+    description: Perfil de empresa
+  - name: Clients
+    description: Gestión de clientes
+  - name: Suppliers
+    description: Gestión de proveedores
+  - name: Products
+    description: Catálogo de productos y servicios
+  - name: Catalogs
+    description: Catálogos SAT
+  - name: Invoices
+    description: Facturación CFDI 4.0
+  - name: Expenses
+    description: Gastos y CFDI recibidos
+  - name: Payments
+    description: Pagos, cobros y REP 2.0
+  - name: Declarations
+    description: Declaraciones y papeles de trabajo
+  - name: Reports
+    description: Reportes operativos y fiscales
+  - name: Audit
+    description: Bitácora de auditoría
+  - name: Attachments
+    description: Archivos adjuntos
+
+paths:
+  # ── Auth ──
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Iniciar sesión
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Renovar token de acceso
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Token renovado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Cerrar sesión
+      operationId: logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '204':
+          description: Sesión cerrada
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Obtener usuario actual
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Usuario actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+
+  # ── Companies ──
+  /api/v1/companies:
+    post:
+      tags: [Companies]
+      summary: Crear empresa
+      operationId: createCompany
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCompanyRequest'
+      responses:
+        '201':
+          description: Empresa creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyDto'
+
+  /api/v1/companies/{companyId}:
+    get:
+      tags: [Companies]
+      summary: Obtener empresa
+      operationId: getCompany
+      parameters:
+        - $ref: '#/components/parameters/companyId'
+      responses:
+        '200':
+          description: Empresa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyDto'
+    patch:
+      tags: [Companies]
+      summary: Actualizar empresa
+      operationId: updateCompany
+      parameters:
+        - $ref: '#/components/parameters/companyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCompanyRequest'
+      responses:
+        '200':
+          description: Empresa actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyDto'
+
+  # ── Clients ──
+  /api/v1/clients:
+    get:
+      tags: [Clients]
+      summary: Listar clientes
+      operationId: listClients
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Búsqueda por RFC o nombre
+      responses:
+        '200':
+          description: Lista de clientes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientPage'
+    post:
+      tags: [Clients]
+      summary: Crear cliente
+      operationId: createClient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClientRequest'
+      responses:
+        '201':
+          description: Cliente creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientDto'
+        '409':
+          description: RFC duplicado en la empresa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '422':
+          description: Validación fiscal fallida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/clients/{clientId}:
+    get:
+      tags: [Clients]
+      summary: Obtener cliente
+      operationId: getClient
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Cliente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientDto'
+    patch:
+      tags: [Clients]
+      summary: Actualizar cliente
+      operationId: updateClient
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientRequest'
+      responses:
+        '200':
+          description: Cliente actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientDto'
+    delete:
+      tags: [Clients]
+      summary: Eliminar cliente (soft delete)
+      operationId: deleteClient
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Cliente eliminado
+
+  /api/v1/clients/{clientId}/transactions:
+    get:
+      tags: [Clients]
+      summary: Historial transaccional del cliente
+      operationId: getClientTransactions
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200':
+          description: Transacciones del cliente
+
+  # ── Suppliers ──
+  /api/v1/suppliers:
+    get:
+      tags: [Suppliers]
+      summary: Listar proveedores
+      operationId: listSuppliers
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: Lista de proveedores
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierPage'
+    post:
+      tags: [Suppliers]
+      summary: Crear proveedor
+      operationId: createSupplier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSupplierRequest'
+      responses:
+        '201':
+          description: Proveedor creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierDto'
+        '409':
+          description: RFC duplicado
+        '422':
+          description: Validación fallida
+
+  /api/v1/suppliers/{supplierId}:
+    get:
+      tags: [Suppliers]
+      summary: Obtener proveedor
+      operationId: getSupplier
+      parameters:
+        - name: supplierId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Proveedor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierDto'
+    patch:
+      tags: [Suppliers]
+      summary: Actualizar proveedor
+      operationId: updateSupplier
+      parameters:
+        - name: supplierId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSupplierRequest'
+      responses:
+        '200':
+          description: Proveedor actualizado
+    delete:
+      tags: [Suppliers]
+      summary: Eliminar proveedor
+      operationId: deleteSupplier
+      parameters:
+        - name: supplierId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Proveedor eliminado
+
+  # ── Products ──
+  /api/v1/products:
+    get:
+      tags: [Products]
+      summary: Listar productos
+      operationId: listProducts
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: Lista de productos
+    post:
+      tags: [Products]
+      summary: Crear producto
+      operationId: createProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+      responses:
+        '201':
+          description: Producto creado
+
+  /api/v1/products/{productId}:
+    get:
+      tags: [Products]
+      summary: Obtener producto
+      operationId: getProduct
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Producto
+    patch:
+      tags: [Products]
+      summary: Actualizar producto
+      operationId: updateProduct
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Producto actualizado
+    delete:
+      tags: [Products]
+      summary: Eliminar producto
+      operationId: deleteProduct
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Producto eliminado
+
+  # ── Catalogs ──
+  /api/v1/catalogs/{catalogName}:
+    get:
+      tags: [Catalogs]
+      summary: Obtener catálogo SAT
+      operationId: getCatalog
+      security: []
+      parameters:
+        - name: catalogName
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - regimen-fiscal
+              - uso-cfdi
+              - forma-pago
+              - clave-prod-serv
+              - clave-unidad
+              - objeto-imp
+              - impuesto
+              - tipo-factor
+              - tasa-o-cuota
+              - motivo-cancelacion
+              - moneda
+              - tipo-comprobante
+              - tipo-relacion
+      responses:
+        '200':
+          description: Entradas del catálogo
+
+  /api/v1/catalog-sync-runs:
+    post:
+      tags: [Catalogs]
+      summary: Iniciar sincronización de catálogo
+      operationId: syncCatalog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [catalogName]
+              properties:
+                catalogName:
+                  type: string
+      responses:
+        '202':
+          description: Sincronización iniciada
+
+  # ── Invoices ──
+  /api/v1/invoices:
+    get:
+      tags: [Invoices]
+      summary: Listar facturas
+      operationId: listInvoices
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, VALIDATED, STAMPED, CANCELLED]
+      responses:
+        '200':
+          description: Lista de facturas
+
+  /api/v1/invoices/drafts:
+    post:
+      tags: [Invoices]
+      summary: Crear borrador de factura
+      operationId: createInvoiceDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceDraftRequest'
+      responses:
+        '201':
+          description: Borrador creado
+
+  /api/v1/invoices/{invoiceId}:
+    get:
+      tags: [Invoices]
+      summary: Obtener factura
+      operationId: getInvoice
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Factura
+
+  /api/v1/invoices/{invoiceId}/validate:
+    post:
+      tags: [Invoices]
+      summary: Validar factura antes de timbrar
+      operationId: validateInvoice
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Resultado de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+
+  /api/v1/invoices/{invoiceId}/stamp:
+    post:
+      tags: [Invoices]
+      summary: Timbrar CFDI
+      operationId: stampInvoice
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Timbrado aceptado para proceso asíncrono
+        '409':
+          description: Documento ya timbrado o petición duplicada
+        '422':
+          description: Documento no fiscalmente válido
+
+  /api/v1/invoices/{invoiceId}/cancel:
+    post:
+      tags: [Invoices]
+      summary: Cancelar CFDI
+      operationId: cancelInvoice
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelRequest'
+      responses:
+        '200':
+          description: CFDI cancelado
+        '422':
+          description: No se puede cancelar
+
+  /api/v1/invoices/{invoiceId}/payment-complements:
+    post:
+      tags: [Invoices]
+      summary: Generar complemento de pago (REP 2.0)
+      operationId: createPaymentComplement
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Complemento de pago generado
+
+  /api/v1/credit-notes:
+    post:
+      tags: [Invoices]
+      summary: Crear nota de crédito
+      operationId: createCreditNote
+      responses:
+        '201':
+          description: Nota de crédito creada
+
+  # ── Expenses ──
+  /api/v1/expenses:
+    get:
+      tags: [Expenses]
+      summary: Listar gastos
+      operationId: listExpenses
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200':
+          description: Lista de gastos
+    post:
+      tags: [Expenses]
+      summary: Crear gasto manual
+      operationId: createExpense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpenseRequest'
+      responses:
+        '201':
+          description: Gasto creado
+
+  /api/v1/expenses/import-xml:
+    post:
+      tags: [Expenses]
+      summary: Importar gasto desde XML CFDI
+      operationId: importExpenseXml
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Gasto importado desde XML
+
+  /api/v1/expenses/{expenseId}:
+    get:
+      tags: [Expenses]
+      summary: Obtener gasto
+      operationId: getExpense
+      parameters:
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Gasto
+
+  # ── Payments ──
+  /api/v1/payments:
+    get:
+      tags: [Payments]
+      summary: Listar pagos
+      operationId: listPayments
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200':
+          description: Lista de pagos
+    post:
+      tags: [Payments]
+      summary: Registrar pago
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Pago registrado
+
+  /api/v1/payments/{paymentId}:
+    get:
+      tags: [Payments]
+      summary: Obtener pago
+      operationId: getPayment
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pago
+
+  /api/v1/payments/{paymentId}/apply:
+    post:
+      tags: [Payments]
+      summary: Aplicar pago contra documento
+      operationId: applyPayment
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyPaymentRequest'
+      responses:
+        '200':
+          description: Pago aplicado
+
+  # ── Reports ──
+  /api/v1/reports/income-expense:
+    get:
+      tags: [Reports]
+      summary: Reporte de ingresos y egresos
+      operationId: getIncomeExpenseReport
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Reporte
+
+  /api/v1/reports/taxes:
+    get:
+      tags: [Reports]
+      summary: Reporte de impuestos
+      operationId: getTaxReport
+      parameters:
+        - name: periodKey
+          in: query
+          required: true
+          schema:
+            type: string
+            description: "Formato: YYYY-MM"
+      responses:
+        '200':
+          description: Reporte de impuestos
+
+  /api/v1/reports/aging:
+    get:
+      tags: [Reports]
+      summary: Reporte de antigüedad de saldos
+      operationId: getAgingReport
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [AR, AP]
+      responses:
+        '200':
+          description: Reporte de antigüedad
+
+  /api/v1/reports/client-summary:
+    get:
+      tags: [Reports]
+      summary: Resumen por cliente
+      operationId: getClientSummary
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Resumen por cliente
+
+  /api/v1/reports/supplier-summary:
+    get:
+      tags: [Reports]
+      summary: Resumen por proveedor
+      operationId: getSupplierSummary
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Resumen por proveedor
+
+  # ── Declarations ──
+  /api/v1/declarations:
+    get:
+      tags: [Declarations]
+      summary: Listar declaraciones
+      operationId: listDeclarations
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [MONTHLY, ANNUAL, DIOT, INFORMATIVE]
+      responses:
+        '200':
+          description: Lista de declaraciones
+
+  /api/v1/declarations/monthly-workpapers:generate:
+    post:
+      tags: [Declarations]
+      summary: Generar papeles de trabajo mensuales
+      operationId: generateMonthlyWorkpapers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateWorkpapersRequest'
+      responses:
+        '201':
+          description: Papeles generados
+
+  /api/v1/declarations/annual-summary:generate:
+    post:
+      tags: [Declarations]
+      summary: Generar resumen anual
+      operationId: generateAnnualSummary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [year]
+              properties:
+                year:
+                  type: integer
+      responses:
+        '201':
+          description: Resumen anual generado
+
+  /api/v1/declarations/{declarationId}:
+    get:
+      tags: [Declarations]
+      summary: Obtener declaración
+      operationId: getDeclaration
+      parameters:
+        - name: declarationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Declaración
+
+  # ── Audit ──
+  /api/v1/audit:
+    get:
+      tags: [Audit]
+      summary: Listar bitácora de auditoría
+      operationId: listAuditLog
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200':
+          description: Bitácora
+
+  /api/v1/audit/entity/{entityType}/{entityId}:
+    get:
+      tags: [Audit]
+      summary: Auditoría por entidad
+      operationId: getEntityAudit
+      parameters:
+        - name: entityType
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: entityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Registros de auditoría
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    companyId:
+      name: companyId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 0
+    size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        default: 10
+    sort:
+      name: sort
+      in: query
+      schema:
+        type: string
+        description: "Campo y dirección, ej: legalName,asc"
+
+  schemas:
+    # ── Auth ──
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+          description: Segundos hasta expiración
+
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        companyId:
+          type: string
+          format: uuid
+        email:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+
+    # ── Company ──
+    CompanyDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        rfc:
+          type: string
+        legalName:
+          type: string
+        taxpayerType:
+          type: string
+          enum: [PERSONA_MORAL, PERSONA_FISICA]
+        fiscalRegimeCode:
+          type: string
+        taxZoneProfile:
+          type: string
+        postalCode:
+          type: string
+        active:
+          type: boolean
+
+    CreateCompanyRequest:
+      type: object
+      required: [rfc, legalName, taxpayerType, fiscalRegimeCode]
+      properties:
+        rfc:
+          type: string
+          minLength: 12
+          maxLength: 13
+        legalName:
+          type: string
+        taxpayerType:
+          type: string
+          enum: [PERSONA_MORAL, PERSONA_FISICA]
+        fiscalRegimeCode:
+          type: string
+        postalCode:
+          type: string
+
+    UpdateCompanyRequest:
+      type: object
+      properties:
+        legalName:
+          type: string
+        fiscalRegimeCode:
+          type: string
+        taxZoneProfile:
+          type: string
+        postalCode:
+          type: string
+
+    # ── Clients ──
+    ClientDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        companyId:
+          type: string
+          format: uuid
+        rfc:
+          type: string
+        legalName:
+          type: string
+        tradeName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        website:
+          type: string
+        fiscalRegimeCode:
+          type: string
+        defaultUsoCfdiCode:
+          type: string
+        defaultFormaPagoCode:
+          type: string
+        defaultMetodoPagoCode:
+          type: string
+        defaultPostalCode:
+          type: string
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ClientPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientDto'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalItems:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+
+    CreateClientRequest:
+      type: object
+      required: [rfc, legalName, fiscalRegimeCode]
+      properties:
+        rfc:
+          type: string
+        legalName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        website:
+          type: string
+        fiscalRegimeCode:
+          type: string
+        defaultUsoCfdiCode:
+          type: string
+        defaultFormaPagoCode:
+          type: string
+        defaultPostalCode:
+          type: string
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/AddressRequest'
+
+    UpdateClientRequest:
+      type: object
+      properties:
+        legalName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        website:
+          type: string
+        fiscalRegimeCode:
+          type: string
+        defaultUsoCfdiCode:
+          type: string
+        defaultFormaPagoCode:
+          type: string
+        defaultPostalCode:
+          type: string
+
+    AddressRequest:
+      type: object
+      required: [street1, postalCode]
+      properties:
+        street1:
+          type: string
+        street2:
+          type: string
+        exteriorNumber:
+          type: string
+        interiorNumber:
+          type: string
+        neighborhood:
+          type: string
+        city:
+          type: string
+        municipalityCode:
+          type: string
+        stateCode:
+          type: string
+        postalCode:
+          type: string
+        countryCode:
+          type: string
+          default: MEX
+
+    # ── Suppliers ──
+    SupplierDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        companyId:
+          type: string
+          format: uuid
+        rfc:
+          type: string
+        legalName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        fiscalRegimeCode:
+          type: string
+        nationality:
+          type: string
+        active:
+          type: boolean
+
+    SupplierPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierDto'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalItems:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+
+    CreateSupplierRequest:
+      type: object
+      required: [rfc, legalName, fiscalRegimeCode]
+      properties:
+        rfc:
+          type: string
+        legalName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        fiscalRegimeCode:
+          type: string
+        nationality:
+          type: string
+          default: NATIONAL
+
+    # ── Products ──
+    CreateProductRequest:
+      type: object
+      required: [internalName, satProductCode, satUnitCode, unitPrice]
+      properties:
+        internalName:
+          type: string
+        description:
+          type: string
+        satProductCode:
+          type: string
+        satUnitCode:
+          type: string
+        unitPrice:
+          type: number
+          format: decimal
+        currencyCode:
+          type: string
+          default: MXN
+        objetoImpCode:
+          type: string
+          default: '02'
+        taxProfiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaxProfileRequest'
+
+    TaxProfileRequest:
+      type: object
+      required: [taxCode, factorType, rate, validFrom]
+      properties:
+        taxCode:
+          type: string
+        factorType:
+          type: string
+        rate:
+          type: number
+          format: decimal
+        isTransfer:
+          type: boolean
+          default: true
+        isWithholding:
+          type: boolean
+          default: false
+        validFrom:
+          type: string
+          format: date
+
+    # ── Invoices ──
+    CreateInvoiceDraftRequest:
+      type: object
+      required: [clientId, invoiceType, paymentMethodCode, usoCfdiCode]
+      properties:
+        clientId:
+          type: string
+          format: uuid
+        invoiceType:
+          type: string
+          enum: [I, E, T, P]
+        paymentMethodCode:
+          type: string
+          enum: [PUE, PPD]
+        paymentFormCode:
+          type: string
+        usoCfdiCode:
+          type: string
+        currencyCode:
+          type: string
+          default: MXN
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLineRequest'
+
+    InvoiceLineRequest:
+      type: object
+      required: [description, quantity, unitPrice, satProductCode, satUnitCode]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        description:
+          type: string
+        quantity:
+          type: number
+        unitPrice:
+          type: number
+        satProductCode:
+          type: string
+        satUnitCode:
+          type: string
+        taxProfileId:
+          type: string
+          format: uuid
+
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+
+    CancelRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          type: string
+          enum: ['01', '02', '03', '04']
+        replacementUuid:
+          type: string
+          format: uuid
+          description: Requerido cuando reasonCode es '01'
+
+    # ── Expenses ──
+    CreateExpenseRequest:
+      type: object
+      required: [supplierId, total]
+      properties:
+        supplierId:
+          type: string
+          format: uuid
+        total:
+          type: number
+        subtotal:
+          type: number
+        currencyCode:
+          type: string
+          default: MXN
+        category:
+          type: string
+        notes:
+          type: string
+
+    # ── Payments ──
+    CreatePaymentRequest:
+      type: object
+      required: [paymentDirection, paymentFormCode, amount, paidAt]
+      properties:
+        paymentDirection:
+          type: string
+          enum: [INBOUND, OUTBOUND]
+        paymentFormCode:
+          type: string
+        currencyCode:
+          type: string
+          default: MXN
+        amount:
+          type: number
+        paidAt:
+          type: string
+          format: date-time
+        operationNumber:
+          type: string
+        notes:
+          type: string
+
+    ApplyPaymentRequest:
+      type: object
+      required: [documentType, documentId, amountPaid]
+      properties:
+        documentType:
+          type: string
+          enum: [INVOICE, EXPENSE]
+        documentId:
+          type: string
+          format: uuid
+        amountPaid:
+          type: number
+
+    # ── Declarations ──
+    GenerateWorkpapersRequest:
+      type: object
+      required: [year, month]
+      properties:
+        year:
+          type: integer
+        month:
+          type: integer
+          minimum: 1
+          maximum: 12
+
+    # ── Common ──
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+        traceId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        fieldErrors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+              rejectedValue: {}

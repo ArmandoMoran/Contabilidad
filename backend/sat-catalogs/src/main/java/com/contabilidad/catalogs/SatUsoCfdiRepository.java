@@ -1,0 +1,13 @@
+package com.contabilidad.catalogs;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface SatUsoCfdiRepository extends JpaRepository<SatUsoCfdi, UUID> {
+
+    Optional<SatUsoCfdi> findByCodeAndActiveTrue(String code);
+
+    List<SatUsoCfdi> findAllByActiveTrue();
+}

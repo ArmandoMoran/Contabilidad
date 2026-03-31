@@ -1,0 +1,56 @@
+{
+  "mappings": [
+    {
+      "name": "PAC Stamp - Simulated",
+      "request": {
+        "method": "POST",
+        "urlPathPattern": "/pac/v1/stamp"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "uuid": "{{randomValue type='UUID'}}",
+          "satSeal": "SIMULATED_SAT_SEAL",
+          "cfdiSeal": "SIMULATED_CFDI_SEAL",
+          "satCertNumber": "00001000000000000001",
+          "stampDate": "{{now format='yyyy-MM-dd\\'T\\'HH:mm:ss'}}"
+        },
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "name": "PAC Cancel - Simulated",
+      "request": {
+        "method": "POST",
+        "urlPathPattern": "/pac/v1/cancel"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "acuse": "SIMULATED_CANCEL_ACUSE",
+          "status": "CANCELLED",
+          "cancelDate": "{{now format='yyyy-MM-dd\\'T\\'HH:mm:ss'}}"
+        },
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "name": "SAT Validation - Simulated",
+      "request": {
+        "method": "POST",
+        "urlPathPattern": "/sat/v1/validate"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "status": "VIGENTE",
+          "cancellable": true,
+          "cancellationStatus": null
+        }
+      }
+    }
+  ]
+}

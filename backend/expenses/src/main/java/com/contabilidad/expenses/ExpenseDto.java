@@ -1,0 +1,43 @@
+package com.contabilidad.expenses;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+
+public record ExpenseDto(
+    UUID id,
+    UUID companyId,
+    UUID supplierId,
+    String expenseType,
+    String status,
+    UUID cfdiUuid,
+    String cfdiVersion,
+    String issuerRfc,
+    String issuerName,
+    String receiverRfc,
+    String receiverName,
+    String invoiceType,
+    String series,
+    String folio,
+    Instant issuedAt,
+    String paymentMethodCode,
+    String paymentFormCode,
+    String usoCfdiCode,
+    String currencyCode,
+    BigDecimal exchangeRate,
+    BigDecimal subtotal,
+    BigDecimal discount,
+    BigDecimal transferredTaxTotal,
+    BigDecimal withheldTaxTotal,
+    BigDecimal total,
+    String category,
+    boolean deductible,
+    String accountingAccount,
+    String notes,
+    String satValidationStatus,
+    Instant satValidatedAt,
+    String xmlObjectKey,
+    String pdfObjectKey,
+    Instant createdAt,
+    Instant updatedAt
+) {}
