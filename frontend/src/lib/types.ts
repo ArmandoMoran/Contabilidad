@@ -99,6 +99,41 @@ export interface Payment {
   paidAt: string;
 }
 
+export interface Contact {
+  id: string;
+  companyId: string;
+  partyType: string;
+  partyId: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  position?: string;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Address {
+  id: string;
+  companyId: string;
+  partyType: string;
+  partyId: string;
+  addressType: string;
+  street1: string;
+  street2?: string;
+  exteriorNumber?: string;
+  interiorNumber?: string;
+  neighborhood?: string;
+  city?: string;
+  municipalityCode?: string;
+  stateCode?: string;
+  postalCode: string;
+  countryCode: string;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface UserInfo {
   id: string;
   companyId: string;
