@@ -16,4 +16,13 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: false,
   },
+  coverage: {
+    reporter: ['text', 'lcov'],
+    thresholds: {
+      lines: 15,
+      functions: 25,
+      branches: 25,
+      statements: 15,
+    },
+  },
 });

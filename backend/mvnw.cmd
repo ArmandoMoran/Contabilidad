@@ -25,7 +25,9 @@
 @IF NOT "%JAVA_HOME%"=="" SET JAVA_EXE="%JAVA_HOME%\bin\java.exe"
 
 %JAVA_EXE% ^
-  -jar %WRAPPER_JAR% ^
+  -Dmaven.multiModuleProjectDirectory=%~dp0. ^
+  -cp %WRAPPER_JAR% ^
+  org.apache.maven.wrapper.MavenWrapperMain ^
   %*
 @IF ERRORLEVEL 1 goto error
 goto end

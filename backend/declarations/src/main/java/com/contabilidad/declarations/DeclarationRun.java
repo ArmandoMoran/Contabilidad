@@ -4,6 +4,8 @@ import com.contabilidad.shared.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -57,6 +59,7 @@ public class DeclarationRun extends BaseEntity {
     @Column(name = "tax_in_favor", nullable = false, precision = 18, scale = 2)
     private BigDecimal taxInFavor = BigDecimal.ZERO;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "snapshot", columnDefinition = "jsonb", nullable = false)
     private String snapshot = "{}";
 

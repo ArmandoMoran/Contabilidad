@@ -1311,6 +1311,24 @@ components:
           default: NATIONAL
 
     # ── Products ──
+    UpdateSupplierRequest:
+      type: object
+      properties:
+        legalName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        fiscalRegimeCode:
+          type: string
+        defaultFormaPagoCode:
+          type: string
+        nationality:
+          type: string
+        diotOperationType:
+          type: string
+
     CreateProductRequest:
       type: object
       required: [internalName, satProductCode, satUnitCode, unitPrice]

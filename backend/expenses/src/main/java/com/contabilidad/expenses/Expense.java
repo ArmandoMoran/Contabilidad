@@ -4,6 +4,8 @@ import com.contabilidad.shared.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -108,6 +110,7 @@ public class Expense extends BaseEntity {
     @Column(name = "pdf_object_key", length = 500)
     private String pdfObjectKey;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "fiscal_snapshot", columnDefinition = "jsonb", nullable = false)
     private String fiscalSnapshot = "{}";
 

@@ -47,6 +47,12 @@ public class InvoiceService {
         return invoice;
     }
 
+    public Invoice createCreditNote(UUID companyId, CreateInvoiceDraftRequest request) {
+        Invoice invoice = createDraft(companyId, request);
+        invoice.setInvoiceType("E");
+        return invoiceRepository.save(invoice);
+    }
+
     @Transactional(readOnly = true)
     public Invoice getInvoice(UUID companyId, UUID invoiceId) {
         log.info("Getting invoice companyId={}, invoiceId={}", companyId, invoiceId);

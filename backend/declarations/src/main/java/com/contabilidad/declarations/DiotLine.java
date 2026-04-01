@@ -69,6 +69,7 @@ public class DiotLine {
 
     protected DiotLine() {
         this.id = UUID.randomUUID();
+        this.createdAt = Instant.now();
     }
 
     public UUID getId() { return id; }

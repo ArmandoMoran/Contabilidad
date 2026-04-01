@@ -16,16 +16,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
-// Dev company UUID — matches V12 seed migration
-const DEV_COMPANY_ID = '11111111-1111-7111-8111-111111111111';
-
 function getHeaders(): HeadersInit {
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
   const token = localStorage.getItem('accessToken');
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  // X-Company-Id required by all backend controllers
-  const companyId = localStorage.getItem('companyId') ?? DEV_COMPANY_ID;
-  headers['X-Company-Id'] = companyId;
+  if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }
 

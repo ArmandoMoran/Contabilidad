@@ -4,6 +4,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -58,6 +60,7 @@ public class InvoiceLine {
     @Column(name = "cuenta_predial", length = 50)
     private String cuentaPredial;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "tax_profile_snapshot", columnDefinition = "jsonb", nullable = false)
     private String taxProfileSnapshot = "[]";
 

@@ -57,6 +57,7 @@ public class DeclarationLine {
 
     protected DeclarationLine() {
         this.id = UUID.randomUUID();
+        this.createdAt = Instant.now();
     }
 
     public UUID getId() { return id; }

@@ -1,11 +1,12 @@
 package com.contabilidad.audit;
 
 import com.contabilidad.shared.PageResponse;
+import com.contabilidad.shared.SecurityContextUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/audit")
@@ -18,9 +19,8 @@ public class AuditController {
     }
 
     @GetMapping
-    public PageResponse<AuditLog> list(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            Pageable pageable) {
+    public PageResponse<AuditLog> list(Pageable pageable) {
+        var companyId = SecurityContextUtils.currentCompanyId();
         Page<AuditLog> page = auditLogRepository.findByCompanyIdOrderByCreatedAtDesc(companyId, pageable);
         return PageResponse.of(
             page.getContent(),
@@ -34,6 +34,10 @@ public class AuditController {
     public List<AuditLog> byEntity(
             @PathVariable String entityType,
             @PathVariable UUID entityId) {
-        return auditLogRepository.findByEntityTypeAndEntityId(entityType, entityId);
+        return auditLogRepository.findByCompanyIdAndEntityTypeAndEntityIdOrderByCreatedAtDesc(
+            SecurityContextUtils.currentCompanyId(),
+            entityType,
+            entityId
+        );
     }
 }

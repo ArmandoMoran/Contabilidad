@@ -1,14 +1,13 @@
 package com.contabilidad.invoicing;
 
 import com.contabilidad.shared.PageResponse;
+import com.contabilidad.shared.SecurityContextUtils;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/api/v1/invoices")
 public class InvoiceController {
@@ -21,26 +20,22 @@ public class InvoiceController {
 
     @PostMapping("/drafts")
     @ResponseStatus(HttpStatus.CREATED)
-    public InvoiceDto createDraft(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @Valid @RequestBody CreateInvoiceDraftRequest request) {
-        Invoice invoice = invoiceService.createDraft(companyId, request);
+    public InvoiceDto createDraft(@Valid @RequestBody CreateInvoiceDraftRequest request) {
+        Invoice invoice = invoiceService.createDraft(SecurityContextUtils.currentCompanyId(), request);
         return InvoiceMapper.toDto(invoice);
     }
 
     @GetMapping("/{id}")
-    public InvoiceDto get(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @PathVariable UUID id) {
-        Invoice invoice = invoiceService.getInvoice(companyId, id);
+    public InvoiceDto get(@PathVariable java.util.UUID id) {
+        Invoice invoice = invoiceService.getInvoice(SecurityContextUtils.currentCompanyId(), id);
         return InvoiceMapper.toDto(invoice);
     }
 
     @GetMapping
     public PageResponse<InvoiceDto> list(
-            @RequestHeader("X-Company-Id") UUID companyId,
             @RequestParam(defaultValue = "DRAFT") String status,
             Pageable pageable) {
+        var companyId = SecurityContextUtils.currentCompanyId();
         Page<Invoice> page = invoiceService.listInvoices(companyId, status, pageable);
         return PageResponse.of(
             page.getContent().stream().map(InvoiceMapper::toDto).toList(),
@@ -51,40 +46,37 @@ public class InvoiceController {
     }
 
     @PostMapping("/{id}/validate")
-    public ValidationResult validate(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @PathVariable UUID id) {
-        List<String> errors = invoiceService.validateInvoice(companyId, id);
+    public ValidationResult validate(@PathVariable java.util.UUID id) {
+        List<String> errors = invoiceService.validateInvoice(SecurityContextUtils.currentCompanyId(), id);
         return errors.isEmpty() ? ValidationResult.ok() : ValidationResult.withErrors(errors);
     }
 
     @PostMapping("/{id}/stamp")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public InvoiceDto stamp(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @PathVariable UUID id,
+            @PathVariable java.util.UUID id,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
-        Invoice invoice = invoiceService.stampInvoice(companyId, id, idempotencyKey);
+        Invoice invoice = invoiceService.stampInvoice(SecurityContextUtils.currentCompanyId(), id, idempotencyKey);
         return InvoiceMapper.toDto(invoice);
     }
 
     @PostMapping("/{id}/cancel")
     public InvoiceDto cancel(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @PathVariable UUID id,
+            @PathVariable java.util.UUID id,
             @Valid @RequestBody CancelRequest request) {
-        Invoice invoice = invoiceService.cancelInvoice(companyId, id, request.reasonCode(), request.replacementUuid());
+        Invoice invoice = invoiceService.cancelInvoice(
+            SecurityContextUtils.currentCompanyId(),
+            id,
+            request.reasonCode(),
+            request.replacementUuid()
+        );
         return InvoiceMapper.toDto(invoice);
     }
 
     @PostMapping("/credit-notes")
     @ResponseStatus(HttpStatus.CREATED)
-    public InvoiceDto createCreditNote(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @Valid @RequestBody CreateInvoiceDraftRequest request) {
-        // Credit note is an invoice with type "E" (Egreso)
-        Invoice invoice = invoiceService.createDraft(companyId, request);
-        invoice.setInvoiceType("E");
+    public InvoiceDto createCreditNote(@Valid @RequestBody CreateInvoiceDraftRequest request) {
+        Invoice invoice = invoiceService.createCreditNote(SecurityContextUtils.currentCompanyId(), request);
         return InvoiceMapper.toDto(invoice);
     }
 }

@@ -22,6 +22,7 @@ hs_err_pid*
 frontend/node_modules/
 frontend/dist/
 frontend/.pnpm-store/
+e2e/node_modules/
 .vite/
 
 # Environment
@@ -35,6 +36,7 @@ infra/compose/data/
 # Logs
 *.log
 logs/
+*.pid
 
 # Test output
 backend/**/test-results/

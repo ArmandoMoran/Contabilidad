@@ -1,10 +1,10 @@
 package com.contabilidad.declarations;
 
+import com.contabilidad.shared.SecurityContextUtils;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/declarations")
@@ -18,34 +18,26 @@ public class DeclarationController {
 
     @PostMapping("/monthly-workpapers:generate")
     @ResponseStatus(HttpStatus.CREATED)
-    public DeclarationRunDto generateMonthlyWorkpapers(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @Valid @RequestBody GenerateWorkpapersRequest request) {
-        DeclarationRun run = declarationService.generateMonthlyWorkpapers(companyId, request);
+    public DeclarationRunDto generateMonthlyWorkpapers(@Valid @RequestBody GenerateWorkpapersRequest request) {
+        DeclarationRun run = declarationService.generateMonthlyWorkpapers(SecurityContextUtils.currentCompanyId(), request);
         return toDto(run);
     }
 
     @PostMapping("/annual-summary:generate")
     @ResponseStatus(HttpStatus.CREATED)
-    public DeclarationRunDto generateAnnualSummary(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @RequestParam int year) {
-        DeclarationRun run = declarationService.generateAnnualSummary(companyId, year);
+    public DeclarationRunDto generateAnnualSummary(@RequestParam int year) {
+        DeclarationRun run = declarationService.generateAnnualSummary(SecurityContextUtils.currentCompanyId(), year);
         return toDto(run);
     }
 
     @GetMapping("/{id}")
-    public DeclarationRunDto get(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @PathVariable UUID id) {
-        return toDto(declarationService.getDeclaration(companyId, id));
+    public DeclarationRunDto get(@PathVariable java.util.UUID id) {
+        return toDto(declarationService.getDeclaration(SecurityContextUtils.currentCompanyId(), id));
     }
 
     @GetMapping
-    public List<DeclarationRunDto> list(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @RequestParam int fiscalYear) {
-        return declarationService.listDeclarations(companyId, fiscalYear).stream()
+    public List<DeclarationRunDto> list(@RequestParam int fiscalYear) {
+        return declarationService.listDeclarations(SecurityContextUtils.currentCompanyId(), fiscalYear).stream()
             .map(this::toDto)
             .toList();
     }

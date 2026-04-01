@@ -1,13 +1,12 @@
 package com.contabilidad.payments;
 
 import com.contabilidad.shared.PageResponse;
+import com.contabilidad.shared.SecurityContextUtils;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/api/v1/payments")
 public class PaymentController {
@@ -20,27 +19,23 @@ public class PaymentController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public PaymentDto create(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @Valid @RequestBody CreatePaymentRequest request) {
-        Payment payment = paymentService.registerPayment(companyId, request);
+    public PaymentDto create(@Valid @RequestBody CreatePaymentRequest request) {
+        Payment payment = paymentService.registerPayment(SecurityContextUtils.currentCompanyId(), request);
         return PaymentMapper.toDto(payment);
     }
 
     @PostMapping("/{id}/apply")
     @ResponseStatus(HttpStatus.CREATED)
     public PaymentApplicationDto apply(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @PathVariable UUID id,
+            @PathVariable java.util.UUID id,
             @Valid @RequestBody ApplyPaymentRequest request) {
-        PaymentApplication application = paymentService.applyPayment(companyId, id, request);
+        PaymentApplication application = paymentService.applyPayment(SecurityContextUtils.currentCompanyId(), id, request);
         return PaymentMapper.toApplicationDto(application);
     }
 
     @GetMapping
-    public PageResponse<PaymentDto> list(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            Pageable pageable) {
+    public PageResponse<PaymentDto> list(Pageable pageable) {
+        var companyId = SecurityContextUtils.currentCompanyId();
         Page<Payment> page = paymentService.listPayments(companyId, pageable);
         return PageResponse.of(
             page.getContent().stream().map(PaymentMapper::toDto).toList(),
@@ -51,10 +46,8 @@ public class PaymentController {
     }
 
     @GetMapping("/{id}")
-    public PaymentDto get(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @PathVariable UUID id) {
-        Payment payment = paymentService.getPayment(companyId, id);
+    public PaymentDto get(@PathVariable java.util.UUID id) {
+        Payment payment = paymentService.getPayment(SecurityContextUtils.currentCompanyId(), id);
         return PaymentMapper.toDto(payment);
     }
 }

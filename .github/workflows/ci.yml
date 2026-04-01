@@ -9,6 +9,7 @@ on:
 env:
   JAVA_VERSION: '25'
   NODE_VERSION: '22'
+  PNPM_VERSION: '10'
 
 jobs:
   lint-typecheck:
@@ -19,7 +20,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -39,48 +40,6 @@ jobs:
         working-directory: frontend
         run: pnpm typecheck
 
-  backend-test:
-    name: Backend Tests
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_DB: contabilidad_test
-          POSTGRES_USER: contabilidad
-          POSTGRES_PASSWORD: contabilidad_dev
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: temurin
-          cache: maven
-
-      - name: Run backend tests
-        working-directory: backend
-        run: ./mvnw verify -B -Dspring.profiles.active=test
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: contabilidad_test
-          DB_USER: contabilidad
-          DB_PASSWORD: contabilidad_dev
-
-      - name: Check coverage thresholds
-        working-directory: backend
-        run: |
-          echo "Coverage reports generated — enforce 85% line / 75% branch in JaCoCo config"
-
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
@@ -89,7 +48,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -97,21 +56,94 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      - name: Run tests with coverage
+      - name: Run frontend tests with coverage gates
         working-directory: frontend
         run: pnpm test:coverage
 
-      - name: Check coverage thresholds
+  backend-test:
+    name: Backend Tests & Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Run backend verify
+        working-directory: backend
+        run: ./mvnw -pl app -am clean verify -B
+
+      - name: Enforce backend coverage thresholds
         run: |
-          echo "Enforce 80% line / 70% branch coverage in vitest config"
+          python - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          report = Path("backend/app/target/site/jacoco-aggregate/jacoco.xml")
+          if not report.exists():
+              print(f"Coverage report not found: {report}", file=sys.stderr)
+              sys.exit(1)
+
+          root = ET.parse(report).getroot()
+
+          def ratio(counter_type: str) -> float:
+              for counter in root.findall("counter"):
+                  if counter.attrib["type"] == counter_type:
+                      missed = int(counter.attrib["missed"])
+                      covered = int(counter.attrib["covered"])
+                      total = missed + covered
+                      return 1.0 if total == 0 else covered / total
+              raise SystemExit(f"Counter {counter_type} not found")
+
+          line_ratio = ratio("LINE")
+          branch_ratio = ratio("BRANCH")
+          min_line = 0.25
+          min_branch = 0.10
+
+          print(f"Backend aggregate coverage: line={line_ratio:.4f}, branch={branch_ratio:.4f}")
+          if line_ratio < min_line or branch_ratio < min_branch:
+              print(
+                  f"Coverage gate failed: required line>={min_line:.2%} and branch>={min_branch:.2%}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          PY
+
+      - name: Upload backend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jacoco-report
+          path: backend/app/target/site/jacoco-aggregate
 
   api-tests:
     name: API Tests
     needs: [backend-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Run API integration tests against the running app context
+        working-directory: backend
+        run: ./mvnw -pl app -am -Dtest=AuthAndClientApiIT,FiscalWorkflowApiIT test -B
+
+  e2e-smoke:
+    name: E2E Smoke Tests
+    needs: [lint-typecheck, frontend-test, backend-test]
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -123,10 +155,10 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U contabilidad -d contabilidad_test"
           --health-interval 5s
           --health-timeout 3s
-          --health-retries 5
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
@@ -137,49 +169,68 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Build backend
-        working-directory: backend
-        run: ./mvnw package -B -DskipTests
-
-      - name: Start backend
-        working-directory: backend
-        run: |
-          java -jar app/target/app-*.jar --spring.profiles.active=test &
-          sleep 15
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: contabilidad_test
-          DB_USER: contabilidad
-          DB_PASSWORD: contabilidad_dev
-
-      - name: Run API tests
-        working-directory: backend
-        run: |
-          echo "REST Assured API tests go here"
-
-  e2e-smoke:
-    name: E2E Smoke Tests
-    needs: [backend-test, frontend-test]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: |
+            frontend/pnpm-lock.yaml
+            e2e/pnpm-lock.yaml
 
-      - name: Install Playwright
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Install e2e dependencies
         working-directory: e2e
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        working-directory: e2e
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build backend jar
+        working-directory: backend
+        run: ./mvnw -pl app -am clean package -DskipTests -B
+
+      - name: Start backend
+        working-directory: backend
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: contabilidad_test
+          DB_USER: contabilidad
+          DB_PASSWORD: contabilidad_dev
         run: |
-          pnpm install --frozen-lockfile || true
-          echo "Playwright E2E tests placeholder"
+          nohup java -jar app/target/app-0.1.0-SNAPSHOT.jar > ../backend-e2e.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/actuator/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend did not start in time" >&2
+          cat ../backend-e2e.log >&2 || true
+          exit 1
+
+      - name: Run Playwright smoke tests
+        working-directory: e2e
+        run: pnpm test
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+            backend-e2e.log
 
   openapi-lint:
     name: OpenAPI Lint
@@ -187,27 +238,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Lint OpenAPI spec
-        run: |
-          npx @stoplight/spectral-cli lint openapi/contabilidad-api.yaml || true
+        run: pnpm dlx @stoplight/spectral-cli@6.15.0 lint --fail-severity=error openapi/contabilidad-api.yaml
 
   docker-build:
     name: Docker Image Build
-    needs: [backend-test, frontend-test]
+    needs: [backend-test, frontend-test, openapi-lint]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Build backend image
-        run: |
-          echo "docker build -f backend/Dockerfile -t contabilidad-backend ."
-          echo "Docker build placeholder"
+        run: docker build -f backend/Dockerfile -t contabilidad-backend:${{ github.sha }} .
 
       - name: Build frontend image
-        run: |
-          echo "docker build -f frontend/Dockerfile -t contabilidad-frontend ."
-          echo "Docker build placeholder"
+        run: docker build -f frontend/Dockerfile -t contabilidad-frontend:${{ github.sha }} .

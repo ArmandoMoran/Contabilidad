@@ -1,5 +1,6 @@
 package com.contabilidad.attachments;
 
+import com.contabilidad.shared.SecurityContextUtils;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -23,17 +24,15 @@ public class AttachmentController {
     @PostMapping("/upload")
     @ResponseStatus(HttpStatus.CREATED)
     public AttachmentDto upload(
-            @RequestHeader("X-Company-Id") UUID companyId,
             @RequestParam String entityType,
             @RequestParam UUID entityId,
-            @RequestParam(required = false) UUID uploadedBy,
             @RequestParam("file") MultipartFile file) throws Exception {
         Attachment attachment = attachmentService.upload(
-            companyId, entityType, entityId,
+            SecurityContextUtils.currentCompanyId(), entityType, entityId,
             file.getOriginalFilename(),
             file.getContentType(),
             file.getBytes(),
-            uploadedBy
+            SecurityContextUtils.currentUserId()
         );
         return toDto(attachment);
     }

@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { Client } from '@/lib/types';
+import type { Address, Client } from '@/lib/types';
 import PageToolbar from '@/components/ui/PageToolbar';
 import Button from '@/components/ui/Button';
 
@@ -30,14 +30,51 @@ interface ClientFormData {
 const inputClass =
   'block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500';
 
-const labelClass = 'block text-sm font-medium text-gray-700 mb-1';
+const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
 
 export function NewClientPage() {
   const navigate = useNavigate();
-  const { register, handleSubmit, formState: { errors } } = useForm<ClientFormData>();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ClientFormData>();
 
   const mutation = useMutation({
-    mutationFn: (data: ClientFormData) => api.post<Client>('/clients', data),
+    mutationFn: async (data: ClientFormData) => {
+      const client = await api.post<Client>('/clients', {
+        rfc: data.rfc,
+        legalName: data.legalName,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+        website: data.website || undefined,
+        fiscalRegimeCode: data.fiscalRegimeCode,
+        defaultUsoCfdiCode: data.defaultUsoCfdiCode || undefined,
+        defaultFormaPagoCode: data.defaultFormaPagoCode || undefined,
+        defaultPostalCode: data.defaultPostalCode || data.postalCode || undefined,
+      });
+
+      const hasAddress = [data.street, data.postalCode, data.city, data.state, data.country]
+        .some((value) => value?.trim());
+
+      if (hasAddress && data.street.trim() && data.postalCode.trim()) {
+        await api.post<Address>(`/clients/${client.id}/addresses`, {
+          addressType: 'FISCAL',
+          street1: data.street.trim(),
+          exteriorNumber: data.exteriorNumber.trim() || undefined,
+          interiorNumber: data.interiorNumber.trim() || undefined,
+          neighborhood: data.neighborhood.trim() || undefined,
+          city: data.city.trim() || undefined,
+          municipalityCode: data.municipality.trim() || undefined,
+          stateCode: data.state.trim() || undefined,
+          postalCode: data.postalCode.trim(),
+          countryCode: (data.country.trim() || 'MEX').toUpperCase(),
+          isPrimary: true,
+        });
+      }
+
+      return client;
+    },
     onSuccess: (client) => navigate(`/clientes/${client.id}`),
   });
 
@@ -56,122 +93,118 @@ export function NewClientPage() {
           </div>
         )}
 
-        {/* Datos fiscales */}
         <section className="rounded-lg border border-gray-200 bg-white p-6">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Datos fiscales</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div>
-              <label className={labelClass}>RFC *</label>
-              <input {...register('rfc', { required: 'RFC es requerido' })} className={inputClass} placeholder="XAXX010101000" />
+              <label htmlFor="rfc" className={labelClass}>RFC *</label>
+              <input id="rfc" {...register('rfc', { required: 'RFC es requerido' })} className={inputClass} placeholder="XAXX010101000" />
               {errors.rfc && <p className="mt-1 text-xs text-red-600">{errors.rfc.message}</p>}
             </div>
             <div>
-              <label className={labelClass}>Razón social *</label>
-              <input {...register('legalName', { required: 'Razón social es requerida' })} className={inputClass} placeholder="Empresa S.A. de C.V." />
+              <label htmlFor="legalName" className={labelClass}>Razon social *</label>
+              <input id="legalName" {...register('legalName', { required: 'Razon social es requerida' })} className={inputClass} placeholder="Empresa S.A. de C.V." />
               {errors.legalName && <p className="mt-1 text-xs text-red-600">{errors.legalName.message}</p>}
             </div>
             <div>
-              <label className={labelClass}>Email</label>
-              <input {...register('email')} type="email" className={inputClass} placeholder="contacto@empresa.com" />
+              <label htmlFor="email" className={labelClass}>Email</label>
+              <input id="email" {...register('email')} type="email" className={inputClass} placeholder="contacto@empresa.com" />
             </div>
             <div>
-              <label className={labelClass}>Teléfono</label>
-              <input {...register('phone')} className={inputClass} placeholder="55 1234 5678" />
+              <label htmlFor="phone" className={labelClass}>Telefono</label>
+              <input id="phone" {...register('phone')} className={inputClass} placeholder="55 1234 5678" />
             </div>
             <div>
-              <label className={labelClass}>Sitio web</label>
-              <input {...register('website')} className={inputClass} placeholder="https://empresa.com" />
+              <label htmlFor="website" className={labelClass}>Sitio web</label>
+              <input id="website" {...register('website')} className={inputClass} placeholder="https://empresa.com" />
             </div>
             <div>
-              <label className={labelClass}>Régimen fiscal *</label>
-              <select {...register('fiscalRegimeCode', { required: 'Régimen fiscal es requerido' })} className={inputClass}>
+              <label htmlFor="fiscalRegimeCode" className={labelClass}>Regimen fiscal *</label>
+              <select id="fiscalRegimeCode" {...register('fiscalRegimeCode', { required: 'Regimen fiscal es requerido' })} className={inputClass}>
                 <option value="">Seleccionar...</option>
                 <option value="601">601 - General de Ley Personas Morales</option>
                 <option value="603">603 - Personas Morales con Fines no Lucrativos</option>
                 <option value="605">605 - Sueldos y Salarios</option>
                 <option value="606">606 - Arrendamiento</option>
-                <option value="612">612 - Personas Físicas con Actividades Empresariales y Profesionales</option>
+                <option value="612">612 - Personas Fisicas con Actividades Empresariales y Profesionales</option>
                 <option value="616">616 - Sin obligaciones fiscales</option>
-                <option value="620">620 - Sociedades Cooperativas de Producción</option>
-                <option value="621">621 - Incorporación Fiscal</option>
-                <option value="625">625 - Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas</option>
-                <option value="626">626 - Régimen Simplificado de Confianza</option>
+                <option value="620">620 - Sociedades Cooperativas de Produccion</option>
+                <option value="621">621 - Incorporacion Fiscal</option>
+                <option value="625">625 - Actividades Empresariales por Plataformas Tecnologicas</option>
+                <option value="626">626 - Regimen Simplificado de Confianza</option>
               </select>
               {errors.fiscalRegimeCode && <p className="mt-1 text-xs text-red-600">{errors.fiscalRegimeCode.message}</p>}
             </div>
             <div>
-              <label className={labelClass}>Uso CFDI por defecto</label>
-              <select {...register('defaultUsoCfdiCode')} className={inputClass}>
+              <label htmlFor="defaultUsoCfdiCode" className={labelClass}>Uso CFDI por defecto</label>
+              <select id="defaultUsoCfdiCode" {...register('defaultUsoCfdiCode')} className={inputClass}>
                 <option value="">Seleccionar...</option>
-                <option value="G01">G01 - Adquisición de mercancías</option>
+                <option value="G01">G01 - Adquisicion de mercancias</option>
                 <option value="G03">G03 - Gastos en general</option>
-                <option value="P01">P01 - Por definir</option>
                 <option value="S01">S01 - Sin efectos fiscales</option>
               </select>
             </div>
             <div>
-              <label className={labelClass}>Forma de pago por defecto</label>
-              <select {...register('defaultFormaPagoCode')} className={inputClass}>
+              <label htmlFor="defaultFormaPagoCode" className={labelClass}>Forma de pago por defecto</label>
+              <select id="defaultFormaPagoCode" {...register('defaultFormaPagoCode')} className={inputClass}>
                 <option value="">Seleccionar...</option>
                 <option value="01">01 - Efectivo</option>
                 <option value="02">02 - Cheque nominativo</option>
-                <option value="03">03 - Transferencia electrónica</option>
-                <option value="04">04 - Tarjeta de crédito</option>
-                <option value="28">28 - Tarjeta de débito</option>
+                <option value="03">03 - Transferencia electronica</option>
+                <option value="04">04 - Tarjeta de credito</option>
+                <option value="28">28 - Tarjeta de debito</option>
                 <option value="99">99 - Por definir</option>
               </select>
             </div>
             <div>
-              <label className={labelClass}>Código postal fiscal</label>
-              <input {...register('defaultPostalCode')} className={inputClass} placeholder="06600" />
+              <label htmlFor="defaultPostalCode" className={labelClass}>Codigo postal fiscal</label>
+              <input id="defaultPostalCode" {...register('defaultPostalCode')} className={inputClass} placeholder="06600" />
             </div>
           </div>
         </section>
 
-        {/* Dirección */}
         <section className="rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Dirección</h2>
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">Direccion</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="md:col-span-2">
-              <label className={labelClass}>Calle</label>
-              <input {...register('street')} className={inputClass} />
+              <label htmlFor="street" className={labelClass}>Calle</label>
+              <input id="street" {...register('street')} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Número exterior</label>
-              <input {...register('exteriorNumber')} className={inputClass} />
+              <label htmlFor="exteriorNumber" className={labelClass}>Numero exterior</label>
+              <input id="exteriorNumber" {...register('exteriorNumber')} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Número interior</label>
-              <input {...register('interiorNumber')} className={inputClass} />
+              <label htmlFor="interiorNumber" className={labelClass}>Numero interior</label>
+              <input id="interiorNumber" {...register('interiorNumber')} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Colonia</label>
-              <input {...register('neighborhood')} className={inputClass} />
+              <label htmlFor="neighborhood" className={labelClass}>Colonia</label>
+              <input id="neighborhood" {...register('neighborhood')} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Ciudad</label>
-              <input {...register('city')} className={inputClass} />
+              <label htmlFor="city" className={labelClass}>Ciudad</label>
+              <input id="city" {...register('city')} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Municipio</label>
-              <input {...register('municipality')} className={inputClass} />
+              <label htmlFor="municipality" className={labelClass}>Municipio</label>
+              <input id="municipality" {...register('municipality')} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Estado</label>
-              <input {...register('state')} className={inputClass} />
+              <label htmlFor="state" className={labelClass}>Estado</label>
+              <input id="state" {...register('state')} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>C.P.</label>
-              <input {...register('postalCode')} className={inputClass} />
+              <label htmlFor="postalCode" className={labelClass}>C.P.</label>
+              <input id="postalCode" {...register('postalCode')} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>País</label>
-              <input {...register('country')} className={inputClass} defaultValue="MEX" />
+              <label htmlFor="country" className={labelClass}>Pais</label>
+              <input id="country" {...register('country')} className={inputClass} defaultValue="MEX" />
             </div>
           </div>
         </section>
 
-        {/* Actions */}
         <div className="flex items-center justify-end gap-3">
           <Button type="button" variant="secondary" onClick={() => navigate(-1)}>
             Cancelar

@@ -1,14 +1,13 @@
 package com.contabilidad.products;
 
 import com.contabilidad.shared.PageResponse;
+import com.contabilidad.shared.SecurityContextUtils;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/api/v1/products")
 public class ProductController {
@@ -20,9 +19,8 @@ public class ProductController {
     }
 
     @GetMapping
-    public PageResponse<ProductDto> list(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            Pageable pageable) {
+    public PageResponse<ProductDto> list(Pageable pageable) {
+        var companyId = SecurityContextUtils.currentCompanyId();
         Page<Product> page = productService.listProducts(companyId, pageable);
         return PageResponse.of(
             page.getContent().stream().map(p -> ProductMapper.toDto(p, productService.getTaxProfiles(p.getId()))).toList(),
@@ -34,39 +32,31 @@ public class ProductController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ProductDto create(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @Valid @RequestBody CreateProductRequest request) {
-        Product product = productService.createProduct(companyId, request);
+    public ProductDto create(@Valid @RequestBody CreateProductRequest request) {
+        Product product = productService.createProduct(SecurityContextUtils.currentCompanyId(), request);
         List<ProductTaxProfile> profiles = productService.getTaxProfiles(product.getId());
         return ProductMapper.toDto(product, profiles);
     }
 
     @GetMapping("/{id}")
-    public ProductDto get(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @PathVariable UUID id) {
-        Product product = productService.getProduct(companyId, id);
+    public ProductDto get(@PathVariable java.util.UUID id) {
+        Product product = productService.getProduct(SecurityContextUtils.currentCompanyId(), id);
         List<ProductTaxProfile> profiles = productService.getTaxProfiles(product.getId());
         return ProductMapper.toDto(product, profiles);
     }
 
     @PatchMapping("/{id}")
     public ProductDto update(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @PathVariable UUID id,
+            @PathVariable java.util.UUID id,
             @Valid @RequestBody UpdateProductRequest request) {
-        Product product = productService.updateProduct(companyId, id, request);
+        Product product = productService.updateProduct(SecurityContextUtils.currentCompanyId(), id, request);
         List<ProductTaxProfile> profiles = productService.getTaxProfiles(product.getId());
         return ProductMapper.toDto(product, profiles);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @RequestHeader("X-User-Id") UUID userId,
-            @PathVariable UUID id) {
-        productService.deleteProduct(companyId, id, userId);
+    public void delete(@PathVariable java.util.UUID id) {
+        productService.deleteProduct(SecurityContextUtils.currentCompanyId(), id, SecurityContextUtils.currentUserId());
     }
 }

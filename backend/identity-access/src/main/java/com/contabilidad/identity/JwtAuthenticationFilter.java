@@ -1,5 +1,6 @@
 package com.contabilidad.identity;
 
+import com.contabilidad.shared.AuthenticatedUser;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -32,8 +34,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 Claims claims = jwtTokenProvider.parseAccessToken(token);
                 String role = claims.get("role", String.class);
+                AuthenticatedUser user = new AuthenticatedUser(
+                        UUID.fromString(claims.getSubject()),
+                        UUID.fromString(claims.get("companyId", String.class)),
+                        claims.get("email", String.class),
+                        claims.get("fullName", String.class),
+                        role
+                );
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                        claims.getSubject(), null,
+                        user, null,
                         List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
                 );
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

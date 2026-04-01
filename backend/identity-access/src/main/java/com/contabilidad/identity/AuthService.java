@@ -1,5 +1,7 @@
 package com.contabilidad.identity;
 
+import com.contabilidad.shared.AuthenticatedUser;
+import com.contabilidad.shared.SecurityContextUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +24,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        User user = userRepository.findWithLockByEmail(request.email())
                 .orElseThrow(() -> new AuthenticationException("Credenciales inválidas"));
 
         if (!user.isActive() || user.isLocked()) {
@@ -63,7 +65,13 @@ public class AuthService {
     }
 
     public UserInfo getCurrentUser() {
-        // Will be populated through SecurityContext
-        throw new UnsupportedOperationException("Implement with SecurityContext");
+        AuthenticatedUser currentUser = SecurityContextUtils.currentUser();
+        return new UserInfo(
+            currentUser.id(),
+            currentUser.companyId(),
+            currentUser.email(),
+            currentUser.fullName(),
+            currentUser.role()
+        );
     }
 }

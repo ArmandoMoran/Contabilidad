@@ -1,13 +1,12 @@
 package com.contabilidad.expenses;
 
 import com.contabilidad.shared.PageResponse;
+import com.contabilidad.shared.SecurityContextUtils;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/api/v1/expenses")
 public class ExpenseController {
@@ -20,35 +19,29 @@ public class ExpenseController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ExpenseDto create(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @Valid @RequestBody CreateExpenseRequest request) {
-        Expense expense = expenseService.create(companyId, request);
+    public ExpenseDto create(@Valid @RequestBody CreateExpenseRequest request) {
+        Expense expense = expenseService.create(SecurityContextUtils.currentCompanyId(), request);
         return ExpenseMapper.toDto(expense);
     }
 
     @PostMapping("/import-xml")
     @ResponseStatus(HttpStatus.CREATED)
-    public ExpenseDto importXml(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @Valid @RequestBody ImportXmlRequest request) {
-        Expense expense = expenseService.importXml(companyId, request);
+    public ExpenseDto importXml(@Valid @RequestBody ImportXmlRequest request) {
+        Expense expense = expenseService.importXml(SecurityContextUtils.currentCompanyId(), request);
         return ExpenseMapper.toDto(expense);
     }
 
     @GetMapping("/{id}")
-    public ExpenseDto get(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @PathVariable UUID id) {
-        Expense expense = expenseService.getExpense(companyId, id);
+    public ExpenseDto get(@PathVariable java.util.UUID id) {
+        Expense expense = expenseService.getExpense(SecurityContextUtils.currentCompanyId(), id);
         return ExpenseMapper.toDto(expense);
     }
 
     @GetMapping
     public PageResponse<ExpenseDto> list(
-            @RequestHeader("X-Company-Id") UUID companyId,
             @RequestParam(required = false) String status,
             Pageable pageable) {
+        var companyId = SecurityContextUtils.currentCompanyId();
         Page<Expense> page;
         if (status != null && !status.isBlank()) {
             page = expenseService.listExpensesByStatus(companyId, status, pageable);

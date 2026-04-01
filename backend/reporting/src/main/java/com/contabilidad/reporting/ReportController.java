@@ -1,10 +1,10 @@
 package com.contabilidad.reporting;
 
+import com.contabilidad.shared.SecurityContextUtils;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/reports")
@@ -18,39 +18,32 @@ public class ReportController {
 
     @GetMapping("/income-expense")
     public IncomeExpenseReport incomeExpense(
-            @RequestHeader("X-Company-Id") UUID companyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return reportService.getIncomeExpenseReport(companyId, from, to);
+        return reportService.getIncomeExpenseReport(SecurityContextUtils.currentCompanyId(), from, to);
     }
 
     @GetMapping("/taxes")
-    public TaxReport taxes(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @RequestParam String periodKey) {
-        return reportService.getTaxReport(companyId, periodKey);
+    public TaxReport taxes(@RequestParam String periodKey) {
+        return reportService.getTaxReport(SecurityContextUtils.currentCompanyId(), periodKey);
     }
 
     @GetMapping("/client-summary")
     public List<PartySummary> clientSummary(
-            @RequestHeader("X-Company-Id") UUID companyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return reportService.getClientSummary(companyId, from, to);
+        return reportService.getClientSummary(SecurityContextUtils.currentCompanyId(), from, to);
     }
 
     @GetMapping("/supplier-summary")
     public List<PartySummary> supplierSummary(
-            @RequestHeader("X-Company-Id") UUID companyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return reportService.getSupplierSummary(companyId, from, to);
+        return reportService.getSupplierSummary(SecurityContextUtils.currentCompanyId(), from, to);
     }
 
     @GetMapping("/aging")
-    public AgingReport aging(
-            @RequestHeader("X-Company-Id") UUID companyId,
-            @RequestParam String type) {
-        return reportService.getAgingReport(companyId, type);
+    public AgingReport aging(@RequestParam String type) {
+        return reportService.getAgingReport(SecurityContextUtils.currentCompanyId(), type);
     }
 }
