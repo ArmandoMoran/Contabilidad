@@ -19,12 +19,16 @@ public class MinioStorageService implements StorageService {
 
     public MinioStorageService(
             @Value("${app.storage.endpoint}") String endpoint,
+            @Value("${app.storage.region:}") String region,
             @Value("${app.storage.access-key}") String accessKey,
             @Value("${app.storage.secret-key}") String secretKey) {
-        this.minioClient = MinioClient.builder()
+        MinioClient.Builder builder = MinioClient.builder()
             .endpoint(endpoint)
-            .credentials(accessKey, secretKey)
-            .build();
+            .credentials(accessKey, secretKey);
+        if (!region.isBlank()) {
+            builder.region(region);
+        }
+        this.minioClient = builder.build();
     }
 
     @Override
