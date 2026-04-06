@@ -39,6 +39,10 @@ pnpm install
 pnpm dev
 ```
 
+## Deploy recomendado
+
+- [Supabase + Cloud Run + Cloudflare Pages](./docs/deploy-supabase-cloud-run-cloudflare-pages.md)
+
 ## Módulos funcionales
 
 - **identity-access** — Autenticación, roles y permisos

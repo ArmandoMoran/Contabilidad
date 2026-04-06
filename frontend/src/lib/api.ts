@@ -1,4 +1,8 @@
-const API_BASE = '/api/v1';
+const DEFAULT_API_BASE = '/api/v1';
+const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
+const API_BASE = configuredApiBase
+  ? configuredApiBase.replace(/\/+$/, '')
+  : DEFAULT_API_BASE;
 
 class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public fieldErrors?: Array<{ field: string; message: string }>) {
