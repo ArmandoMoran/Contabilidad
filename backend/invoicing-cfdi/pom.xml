@@ -36,6 +36,10 @@
         </dependency>
         <dependency>
             <groupId>com.contabilidad</groupId>
+            <artifactId>company-profile</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.contabilidad</groupId>
             <artifactId>products</artifactId>
         </dependency>
         <dependency>

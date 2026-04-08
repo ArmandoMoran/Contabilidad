@@ -16,5 +16,8 @@ public record InvoiceLineDto(
     BigDecimal unitPrice,
     BigDecimal discount,
     BigDecimal subtotal,
-    String objetoImpCode
+    String objetoImpCode,
+    BigDecimal transferredTaxTotal,
+    BigDecimal withheldTaxTotal,
+    BigDecimal total
 ) {}

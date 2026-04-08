@@ -1,5 +1,6 @@
 package com.contabilidad.identity;
 
+import com.contabilidad.shared.BusinessValidationException;
 import com.contabilidad.shared.ProblemDetail;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
@@ -50,6 +51,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ProblemDetail.of(400, "BAD_REQUEST", ex.getMessage(),
                         UUID.randomUUID().toString()));
+    }
+
+    @ExceptionHandler(BusinessValidationException.class)
+    public ResponseEntity<ProblemDetail> handleBusinessValidation(BusinessValidationException ex) {
+        var fieldErrors = ex.getViolations().stream()
+                .map(v -> new ProblemDetail.FieldError(v.field(), v.message(), v.rejectedValue()))
+                .toList();
+        log.warn("Business validation error: {} field errors", fieldErrors.size());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ProblemDetail.withFieldErrors(422, "BUSINESS_VALIDATION_ERROR", "Error de validación",
+                        UUID.randomUUID().toString(), fieldErrors));
     }
 
     @ExceptionHandler(IllegalStateException.class)

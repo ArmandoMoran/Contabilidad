@@ -26,9 +26,12 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Product> listProducts(UUID companyId, Pageable pageable) {
-        log.info("Listing products for companyId={}, page={}", companyId, pageable);
-        Page<Product> page = productRepository.findByCompanyIdAndDeletedAtIsNull(companyId, pageable);
+    public Page<Product> listProducts(UUID companyId, String search, Pageable pageable) {
+        log.info("Listing products for companyId={}, search={}, page={}", companyId, search, pageable);
+        String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+        Page<Product> page = normalizedSearch == null
+            ? productRepository.findByCompanyIdAndDeletedAtIsNull(companyId, pageable)
+            : productRepository.searchByCompanyId(companyId, normalizedSearch, pageable);
         log.debug("Found {} products (total={})", page.getNumberOfElements(), page.getTotalElements());
         return page;
     }

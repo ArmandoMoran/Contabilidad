@@ -77,6 +77,10 @@ public abstract class AbstractApiIntegrationTest {
         return send("GET", path, null, accessToken);
     }
 
+    protected HttpResponse<byte[]> getBytes(String path, String accessToken) throws IOException, InterruptedException {
+        return sendBytes("GET", path, accessToken);
+    }
+
     protected HttpResponse<String> post(String path, Object body) throws IOException, InterruptedException {
         return send("POST", path, body, null);
     }
@@ -135,5 +139,20 @@ public abstract class AbstractApiIntegrationTest {
         }
 
         return httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<byte[]> sendBytes(String method, String path, String accessToken)
+            throws IOException, InterruptedException {
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+            .uri(URI.create("http://localhost:" + port + "/api/v1" + path))
+            .timeout(Duration.ofSeconds(15))
+            .header(HttpHeaders.ACCEPT, "*/*")
+            .method(method, HttpRequest.BodyPublishers.noBody());
+
+        if (accessToken != null) {
+            requestBuilder.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
+        }
+
+        return httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofByteArray());
     }
 }

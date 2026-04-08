@@ -3,14 +3,15 @@ package com.contabilidad.invoicing;
 import java.util.List;
 
 public record ValidationResult(
-    List<String> errors,
-    boolean valid
+    List<InvoiceValidationIssue> issues,
+    boolean valid,
+    InvoicePreviewDto preview
 ) {
-    public static ValidationResult ok() {
-        return new ValidationResult(List.of(), true);
+    public static ValidationResult ok(InvoicePreviewDto preview) {
+        return new ValidationResult(List.of(), true, preview);
     }
 
-    public static ValidationResult withErrors(List<String> errors) {
-        return new ValidationResult(errors, false);
+    public static ValidationResult withIssues(List<InvoiceValidationIssue> issues, InvoicePreviewDto preview) {
+        return new ValidationResult(issues, false, preview);
     }
 }

@@ -38,7 +38,7 @@ const navigation: NavGroup[] = [
   {
     title: 'FACTURACIÓN',
     items: [
-      { label: 'Nueva factura', to: '/facturas/nueva', icon: FileText },
+      { label: 'Nueva factura', to: '/facturacion/nueva', icon: FileText },
       { label: 'Gastos', to: '/gastos', icon: Receipt },
       { label: 'Pagos', to: '/pagos', icon: CreditCard },
     ],
@@ -70,15 +70,15 @@ const navigation: NavGroup[] = [
 
 export default function Sidebar() {
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-60 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
-      <div className="h-14 flex items-center px-5 border-b border-gray-200">
+    <aside className="fixed bottom-0 left-0 top-0 flex w-60 flex-col overflow-y-auto border-r border-gray-200 bg-white">
+      <div className="flex h-14 items-center border-b border-gray-200 px-5">
         <span className="text-lg font-bold text-primary-700">Contabilidad</span>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-6">
+      <nav className="flex-1 space-y-6 px-3 py-4">
         {navigation.map((group) => (
           <div key={group.title}>
-            <p className="px-2 mb-2 text-xs font-semibold tracking-wider text-gray-400 uppercase">
+            <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
               {group.title}
             </p>
             <ul className="space-y-0.5">
@@ -88,9 +88,9 @@ export default function Sidebar() {
                     to={item.to}
                     end={item.to === '/'}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 px-2 py-2 text-sm rounded-md transition-colors ${
+                      `flex items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors ${
                         isActive
-                          ? 'bg-primary-50 text-primary-700 font-medium'
+                          ? 'bg-primary-50 font-medium text-primary-700'
                           : 'text-gray-600 hover:bg-gray-50'
                       }`
                     }
