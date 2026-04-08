@@ -1,327 +1,463 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router';
-import { useMutation } from '@tanstack/react-query';
-import { Plus, Trash2 } from 'lucide-react';
-import { api } from '@/lib/api';
-import type { Invoice } from '@/lib/types';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Plus, ArrowLeft } from 'lucide-react';
 import PageToolbar from '@/components/ui/PageToolbar';
 import Button from '@/components/ui/Button';
-
-interface LineItem {
-  productId: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  discount: number;
-  taxAmount: number;
-  subtotal: number;
-}
+import ClientSearchSelect from '@/components/invoicing/ClientSearchSelect';
+import InvoiceLineEditor from '@/components/invoicing/InvoiceLineEditor';
+import InvoiceSummaryCard from '@/components/invoicing/InvoiceSummaryCard';
+import ValidationAlertList from '@/components/invoicing/ValidationAlertList';
+import { ApiError } from '@/lib/api';
+import { invoiceApi } from '@/lib/invoice-api';
+import type {
+  CatalogOption,
+  InvoiceClientOption,
+  InvoiceFormValues,
+  InvoiceProductOption,
+  InvoiceValidationIssue,
+  InvoiceValidationResult,
+} from '@/lib/invoice-types';
+import {
+  calculateLocalLineSummary,
+  calculateLocalInvoiceSummary,
+  createEmptyInvoiceLine,
+  invoiceFieldPathToFormPath,
+  mapInvoiceFormToDraftRequest,
+} from '@/lib/invoice-utils';
 
 const inputClass =
   'block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500';
 
 const labelClass = 'mb-1 block text-sm font-medium text-gray-700';
 
-function emptyLine(): LineItem {
-  return { productId: '', description: '', quantity: 1, unitPrice: 0, discount: 0, taxAmount: 0, subtotal: 0 };
-}
-
-function calcLine(line: LineItem): LineItem {
-  const base = line.quantity * line.unitPrice - line.discount;
-  const tax = base * 0.16;
-  return { ...line, taxAmount: tax, subtotal: base };
-}
+const defaultCatalogs = {
+  usoCfdi: [{ code: 'G03', description: 'Gastos en general' }],
+  formaPago: [{ code: '03', description: 'Transferencia electrónica de fondos' }],
+  metodoPago: [{ code: 'PUE', description: 'Pago en una sola exhibición' }],
+  monedas: [{ code: 'MXN', description: 'Peso mexicano' }],
+} satisfies Record<string, CatalogOption[]>;
 
 export function NewInvoicePage() {
   const navigate = useNavigate();
-  const [clientId, setClientId] = useState('');
-  const [tipoComprobante, setTipoComprobante] = useState('I');
-  const [metodoPago, setMetodoPago] = useState('PUE');
-  const [formaPago, setFormaPago] = useState('03');
-  const [usoCfdi, setUsoCfdi] = useState('G03');
-  const [moneda, setMoneda] = useState('MXN');
-  const [lines, setLines] = useState<LineItem[]>([emptyLine()]);
-  const [validations, setValidations] = useState<string[]>([]);
+  const [selectedClient, setSelectedClient] = useState<InvoiceClientOption | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, InvoiceProductOption | null>>({});
+  const [validationResult, setValidationResult] = useState<InvoiceValidationResult | null>(null);
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
-  const subtotal = lines.reduce((sum, line) => sum + calcLine(line).subtotal, 0);
-  const ivaTraslado = lines.reduce((sum, line) => sum + calcLine(line).taxAmount, 0);
-  const ivaRetenido = 0;
-  const isrRetenido = 0;
-  const total = subtotal + ivaTraslado - ivaRetenido - isrRetenido;
+  const {
+    control,
+    watch,
+    setValue,
+    getValues,
+    setError,
+    clearErrors,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<InvoiceFormValues>({
+    defaultValues: {
+      clientId: '',
+      invoiceType: 'I',
+      series: '',
+      folio: '',
+      paymentMethodCode: 'PUE',
+      paymentFormCode: '03',
+      usoCfdiCode: 'G03',
+      currencyCode: 'MXN',
+      lines: [createEmptyInvoiceLine()],
+    },
+  });
 
-  function updateLine(index: number, updates: Partial<LineItem>) {
-    setLines((previous) => previous.map((line, currentIndex) => (currentIndex === index ? { ...line, ...updates } : line)));
-  }
+  const { fields: lineFields, append, remove } = useFieldArray({
+    control,
+    name: 'lines',
+  });
+  const values = watch();
+  const localSummary = useMemo(() => calculateLocalInvoiceSummary(values.lines ?? []), [values.lines]);
 
-  function removeLine(index: number) {
-    setLines((previous) => (previous.length === 1 ? previous : previous.filter((_, currentIndex) => currentIndex !== index)));
-  }
+  const { data: currentUser } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => invoiceApi.getCurrentUser(),
+  });
+
+  const { data: company } = useQuery({
+    queryKey: ['companies', currentUser?.companyId],
+    queryFn: () => invoiceApi.getCompany(currentUser!.companyId),
+    enabled: !!currentUser?.companyId,
+  });
+
+  const { data: usoCfdiOptions = defaultCatalogs.usoCfdi } = useQuery({
+    queryKey: ['catalogs', 'uso-cfdi'],
+    queryFn: () => invoiceApi.listUsoCfdi(),
+  });
+
+  const { data: formaPagoOptions = defaultCatalogs.formaPago } = useQuery({
+    queryKey: ['catalogs', 'forma-pago'],
+    queryFn: () => invoiceApi.listFormaPago(),
+  });
+
+  const { data: metodoPagoOptions = defaultCatalogs.metodoPago } = useQuery({
+    queryKey: ['catalogs', 'metodo-pago'],
+    queryFn: () => invoiceApi.listMetodoPago(),
+  });
+
+  const { data: monedaOptions = defaultCatalogs.monedas } = useQuery({
+    queryKey: ['catalogs', 'moneda'],
+    queryFn: () => invoiceApi.listMonedas(),
+  });
+
+  const validateMutation = useMutation({
+    mutationFn: invoiceApi.validateDraft,
+    onSuccess: (result) => {
+      clearAllServerFeedback();
+      setValidationResult(result);
+      applyValidationIssues(result.issues);
+
+      if (result.preview) {
+        setValue('series', result.preview.series ?? getValues('series'));
+        setValue('folio', result.preview.folio ?? getValues('folio'));
+        setValue('paymentMethodCode', result.preview.paymentMethodCode ?? getValues('paymentMethodCode'));
+        setValue('paymentFormCode', result.preview.paymentFormCode ?? getValues('paymentFormCode'));
+        setValue('usoCfdiCode', result.preview.usoCfdiCode ?? getValues('usoCfdiCode'));
+        setValue('currencyCode', result.preview.currencyCode ?? getValues('currencyCode'));
+      }
+    },
+    onError: handleMutationError,
+  });
 
   const draftMutation = useMutation({
-    mutationFn: (payload: object) => api.post<Invoice>('/invoices/drafts', payload),
+    mutationFn: invoiceApi.createDraft,
     onSuccess: (invoice) => navigate(`/facturacion/${invoice.id}`),
+    onError: handleMutationError,
   });
 
   const stampMutation = useMutation({
-    mutationFn: async (payload: object) => {
-      const draft = await api.post<Invoice>('/invoices/drafts', payload);
-      return api.post<Invoice>(`/invoices/${draft.id}/stamp`, {});
-    },
+    mutationFn: invoiceApi.createStamped,
     onSuccess: (invoice) => navigate(`/facturacion/${invoice.id}`),
+    onError: handleMutationError,
   });
 
-  function buildPayload() {
-    return {
-      clientId,
-      invoiceType: tipoComprobante,
-      paymentMethodCode: metodoPago,
-      paymentFormCode: formaPago,
-      usoCfdiCode: usoCfdi,
-      currencyCode: moneda,
-      lines: lines.map((line) => ({
-        productId: line.productId || undefined,
-        description: line.description,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice,
-        discount: line.discount,
-        satProductCode: '01010101',
-        satUnitCode: 'E48',
-      })),
-    };
+  const isBusy = validateMutation.isPending || draftMutation.isPending || stampMutation.isPending;
+
+  function clearAllServerFeedback() {
+    clearErrors();
+    setGeneralError(null);
+    setValidationResult(null);
   }
 
-  function validateDraft() {
-    const errors: string[] = [];
-    if (!clientId.trim()) errors.push('Selecciona un cliente.');
-    if (lines.every((line) => !line.description.trim() && !line.productId.trim())) {
-      errors.push('Agrega al menos un producto o servicio.');
+  function setFormValue<K extends keyof InvoiceFormValues>(field: K, value: InvoiceFormValues[K]) {
+    clearAllServerFeedback();
+    setValue(field as never, value as never, { shouldDirty: true, shouldValidate: false });
+  }
+
+  function setLineValue(index: number, field: keyof InvoiceFormValues['lines'][number], value: string | number) {
+    clearAllServerFeedback();
+    setValue(`lines.${index}.${field}` as const, value as never, { shouldDirty: true, shouldValidate: false });
+  }
+
+  function handleClientSelect(client: InvoiceClientOption) {
+    clearAllServerFeedback();
+    setSelectedClient(client);
+    setValue('clientId', client.id, { shouldDirty: true });
+    setValue('usoCfdiCode', client.defaultUsoCfdiCode || 'G03', { shouldDirty: true });
+    setValue('paymentFormCode', client.defaultFormaPagoCode || '03', { shouldDirty: true });
+    setValue('paymentMethodCode', client.defaultMetodoPagoCode || 'PUE', { shouldDirty: true });
+  }
+
+  function handleClientClear() {
+    clearAllServerFeedback();
+    setSelectedClient(null);
+    setValue('clientId', '', { shouldDirty: true });
+  }
+
+  function handleProductSelect(lineId: string, index: number, product: InvoiceProductOption) {
+    clearAllServerFeedback();
+    setSelectedProducts((previous) => ({ ...previous, [lineId]: product }));
+    setValue(`lines.${index}.productId`, product.id, { shouldDirty: true });
+    setValue(`lines.${index}.description`, product.description || product.internalName, { shouldDirty: true });
+    setValue(`lines.${index}.unitPrice`, product.unitPrice, { shouldDirty: true });
+    setValue(`lines.${index}.satProductCode`, product.satProductCode, { shouldDirty: true });
+    setValue(`lines.${index}.satUnitCode`, product.satUnitCode, { shouldDirty: true });
+    setValue(`lines.${index}.objetoImpCode`, product.objetoImpCode, { shouldDirty: true });
+    setValue(`lines.${index}.currencyCode`, product.currencyCode, { shouldDirty: true });
+
+    if (!getValues('currencyCode') || getValues('currencyCode') === 'MXN') {
+      setValue('currencyCode', product.currencyCode, { shouldDirty: true });
+    }
+  }
+
+  function handleProductClear(lineId: string, index: number) {
+    clearAllServerFeedback();
+    setSelectedProducts((previous) => ({ ...previous, [lineId]: null }));
+    setValue(`lines.${index}.productId`, '', { shouldDirty: true });
+    setValue(`lines.${index}.satProductCode`, '', { shouldDirty: true });
+    setValue(`lines.${index}.satUnitCode`, '', { shouldDirty: true });
+    setValue(`lines.${index}.objetoImpCode`, '', { shouldDirty: true });
+    setValue(`lines.${index}.currencyCode`, '', { shouldDirty: true });
+  }
+
+  function addLine() {
+    clearAllServerFeedback();
+    append(createEmptyInvoiceLine());
+  }
+
+  function removeLine(index: number, lineId: string) {
+    clearAllServerFeedback();
+    remove(index);
+    setSelectedProducts((previous) => {
+      const next = { ...previous };
+      delete next[lineId];
+      return next;
+    });
+  }
+
+  function applyValidationIssues(issues: InvoiceValidationIssue[]) {
+    issues.forEach((issue) => {
+      const formPath = invoiceFieldPathToFormPath(issue.fieldPath);
+      if (formPath && !['subtotal', 'discount', 'total', 'transferredTaxTotal', 'withheldTaxTotal'].includes(formPath)) {
+        setError(formPath as never, { type: 'server', message: issue.message });
+      }
+    });
+  }
+
+  function handleMutationError(error: unknown) {
+    clearErrors();
+    if (error instanceof ApiError) {
+      error.fieldErrors?.forEach((fieldError) => {
+        const formPath = invoiceFieldPathToFormPath(fieldError.field);
+        if (formPath) {
+          setError(formPath as never, { type: 'server', message: fieldError.message });
+        }
+      });
+      setGeneralError(error.message);
+      return;
     }
 
-    lines.forEach((line, index) => {
-      if (line.quantity <= 0) errors.push(`Linea ${index + 1}: la cantidad debe ser mayor a 0.`);
-      if (line.unitPrice <= 0) errors.push(`Linea ${index + 1}: el precio unitario debe ser mayor a 0.`);
-    });
-
-    setValidations(errors);
-    return errors;
+    setGeneralError('Ocurrió un error inesperado al procesar la factura.');
   }
 
+  function validateClientSide(formValues: InvoiceFormValues) {
+    clearErrors();
+    const issues: InvoiceValidationIssue[] = [];
+
+    if (!formValues.clientId) {
+      issues.push({ fieldPath: 'clientId', message: 'Selecciona un cliente.', code: 'CLIENT_REQUIRED' });
+    }
+
+    if (!formValues.lines.length) {
+      issues.push({ fieldPath: 'lines', message: 'Agrega al menos un concepto.', code: 'LINES_REQUIRED' });
+    }
+
+    formValues.lines.forEach((line, index) => {
+      if (!line.productId) {
+        issues.push({ fieldPath: `lines[${index}].productId`, message: 'Selecciona un producto.', code: 'PRODUCT_REQUIRED' });
+      }
+      if (!line.description?.trim()) {
+        issues.push({ fieldPath: `lines[${index}].description`, message: 'La descripción es obligatoria.', code: 'DESCRIPTION_REQUIRED' });
+      }
+      if (Number(line.quantity) <= 0) {
+        issues.push({ fieldPath: `lines[${index}].quantity`, message: 'La cantidad debe ser mayor a cero.', code: 'INVALID_QUANTITY' });
+      }
+      if (Number(line.unitPrice) <= 0) {
+        issues.push({ fieldPath: `lines[${index}].unitPrice`, message: 'El precio unitario debe ser mayor a cero.', code: 'INVALID_UNIT_PRICE' });
+      }
+      if (Number(line.discount) < 0) {
+        issues.push({ fieldPath: `lines[${index}].discount`, message: 'El descuento no puede ser negativo.', code: 'INVALID_DISCOUNT' });
+      }
+    });
+
+    applyValidationIssues(issues);
+    if (issues.length) {
+      setValidationResult({ issues, valid: false, preview: null });
+      return false;
+    }
+
+    return true;
+  }
+
+  const onValidate = handleSubmit(async (formValues) => {
+    clearAllServerFeedback();
+    if (!validateClientSide(formValues)) {
+      return;
+    }
+    try {
+      await validateMutation.mutateAsync(mapInvoiceFormToDraftRequest(formValues));
+    } catch {}
+  });
+
+  const onSaveDraft = handleSubmit(async (formValues) => {
+    clearAllServerFeedback();
+    if (!validateClientSide(formValues)) {
+      return;
+    }
+    try {
+      await draftMutation.mutateAsync(mapInvoiceFormToDraftRequest(formValues));
+    } catch {}
+  });
+
+  const onStamp = handleSubmit(async (formValues) => {
+    clearAllServerFeedback();
+    if (!validateClientSide(formValues)) {
+      return;
+    }
+    try {
+      await stampMutation.mutateAsync(mapInvoiceFormToDraftRequest(formValues));
+    } catch {}
+  });
+
   return (
-    <div>
-      <PageToolbar title="Nueva factura" />
+    <div className="space-y-6">
+      <div>
+        <Link to="/facturacion" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+          <ArrowLeft className="h-4 w-4" />
+          Volver a facturación
+        </Link>
+      </div>
 
-      <div className="space-y-6">
-        <section className="rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="mb-2 text-lg font-semibold text-gray-900">Emisor</h2>
-          <p className="text-sm text-gray-500">Los datos del emisor se toman de la configuracion de tu empresa.</p>
-        </section>
+      <PageToolbar title="Generar factura" />
 
-        <section className="rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Tu cliente</h2>
+      <section className="rounded-lg border border-gray-200 bg-white p-6">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Emisor</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
-            <label htmlFor="clientId" className={labelClass}>Buscar cliente</label>
-            <input
-              id="clientId"
-              type="text"
-              value={clientId}
-              onChange={(event) => setClientId(event.target.value)}
-              className={inputClass}
-              placeholder="Nombre o RFC del cliente..."
-            />
+            <p className="text-sm text-gray-500">Razón social</p>
+            <p className="font-medium text-gray-900">{company?.legalName ?? 'Cargando empresa...'}</p>
           </div>
-        </section>
-
-        <section className="rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Datos de factura</h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <label className={labelClass}>Tipo de comprobante</label>
-              <select value={tipoComprobante} onChange={(event) => setTipoComprobante(event.target.value)} className={inputClass}>
-                <option value="I">I - Ingreso</option>
-                <option value="E">E - Egreso</option>
-                <option value="T">T - Traslado</option>
-                <option value="P">P - Pago</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Metodo de pago</label>
-              <select value={metodoPago} onChange={(event) => setMetodoPago(event.target.value)} className={inputClass}>
-                <option value="PUE">PUE - Pago en una sola exhibicion</option>
-                <option value="PPD">PPD - Pago en parcialidades</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Forma de pago</label>
-              <select value={formaPago} onChange={(event) => setFormaPago(event.target.value)} className={inputClass}>
-                <option value="01">01 - Efectivo</option>
-                <option value="02">02 - Cheque nominativo</option>
-                <option value="03">03 - Transferencia electronica</option>
-                <option value="04">04 - Tarjeta de credito</option>
-                <option value="28">28 - Tarjeta de debito</option>
-                <option value="99">99 - Por definir</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Uso CFDI</label>
-              <select value={usoCfdi} onChange={(event) => setUsoCfdi(event.target.value)} className={inputClass}>
-                <option value="G01">G01 - Adquisicion de mercancias</option>
-                <option value="G03">G03 - Gastos en general</option>
-                <option value="S01">S01 - Sin efectos fiscales</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Moneda</label>
-              <select value={moneda} onChange={(event) => setMoneda(event.target.value)} className={inputClass}>
-                <option value="MXN">MXN - Peso mexicano</option>
-                <option value="USD">USD - Dolar americano</option>
-                <option value="EUR">EUR - Euro</option>
-              </select>
-            </div>
+          <div>
+            <p className="text-sm text-gray-500">RFC</p>
+            <p className="font-medium text-gray-900">{company?.rfc ?? '—'}</p>
           </div>
-        </section>
-
-        <section className="rounded-lg border border-gray-200 bg-white p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Productos o servicios</h2>
-            <Button size="sm" variant="secondary" onClick={() => setLines((previous) => [...previous, emptyLine()])}>
-              <Plus className="h-4 w-4" /> Agregar linea
-            </Button>
+          <div>
+            <p className="text-sm text-gray-500">Régimen fiscal</p>
+            <p className="font-medium text-gray-900">{company?.fiscalRegimeCode ?? '—'}</p>
           </div>
+        </div>
+      </section>
 
-          <div className="space-y-4">
-            {lines.map((line, index) => {
-              const calculatedLine = calcLine(line);
-              return (
-                <div key={index} className="grid grid-cols-12 items-end gap-3 border-b border-gray-100 pb-4">
-                  <div className="col-span-3">
-                    <label htmlFor={`productId-${index}`} className={labelClass}>Producto</label>
-                    <input
-                      id={`productId-${index}`}
-                      value={line.productId}
-                      onChange={(event) => updateLine(index, { productId: event.target.value })}
-                      className={inputClass}
-                      placeholder="Buscar producto..."
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <label htmlFor={`description-${index}`} className={labelClass}>Descripcion</label>
-                    <input
-                      id={`description-${index}`}
-                      value={line.description}
-                      onChange={(event) => updateLine(index, { description: event.target.value })}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <label className={labelClass}>Cant.</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={line.quantity}
-                      onChange={(event) => updateLine(index, { quantity: Number(event.target.value) })}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label htmlFor={`unitPrice-${index}`} className={labelClass}>Precio unit.</label>
-                    <input
-                      id={`unitPrice-${index}`}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={line.unitPrice}
-                      onChange={(event) => updateLine(index, { unitPrice: Number(event.target.value) })}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <label className={labelClass}>Desc.</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={line.discount}
-                      onChange={(event) => updateLine(index, { discount: Number(event.target.value) })}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="col-span-1 text-right">
-                    <label className={labelClass}>Subtotal</label>
-                    <p className="py-2 text-sm font-medium text-gray-900">${calculatedLine.subtotal.toFixed(2)}</p>
-                  </div>
-                  <div className="col-span-1 flex justify-end pb-2">
-                    <button
-                      type="button"
-                      onClick={() => removeLine(index)}
-                      className="transition-colors hover:text-red-600 text-gray-400"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Resumen</h2>
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-gray-600">Subtotal</dt>
-              <dd className="font-medium text-gray-900">${subtotal.toFixed(2)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-600">IVA trasladado (16%)</dt>
-              <dd className="font-medium text-gray-900">${ivaTraslado.toFixed(2)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-600">IVA retenido</dt>
-              <dd className="font-medium text-gray-900">${ivaRetenido.toFixed(2)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-600">ISR retenido</dt>
-              <dd className="font-medium text-gray-900">${isrRetenido.toFixed(2)}</dd>
-            </div>
-            <div className="flex justify-between border-t border-gray-200 pt-2">
-              <dt className="font-semibold text-gray-900">Total</dt>
-              <dd className="text-lg font-bold text-gray-900">${total.toFixed(2)}</dd>
-            </div>
-          </dl>
-        </section>
-
-        {validations.length > 0 && (
-          <section className="rounded-lg border border-red-200 bg-red-50 p-6">
-            <h2 className="mb-2 text-lg font-semibold text-red-800">Validaciones</h2>
-            <ul className="list-inside list-disc space-y-1 text-sm text-red-700">
-              {validations.map((validation, index) => (
-                <li key={index}>{validation}</li>
-              ))}
-            </ul>
-          </section>
+      <section className="rounded-lg border border-gray-200 bg-white p-6">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Cliente / Receptor</h2>
+        <ClientSearchSelect
+          value={selectedClient}
+          onSelect={handleClientSelect}
+          onClear={handleClientClear}
+          error={errors.clientId?.message}
+        />
+        {selectedClient?.defaultPostalCode && (
+          <p className="mt-3 text-sm text-gray-500">Código postal fiscal sugerido: {selectedClient.defaultPostalCode}</p>
         )}
+      </section>
 
-        <div className="flex items-center justify-end gap-3">
-          <Button variant="secondary" onClick={() => draftMutation.mutate(buildPayload())} disabled={draftMutation.isPending}>
-            {draftMutation.isPending ? 'Guardando...' : 'Guardar borrador'}
+      <section className="rounded-lg border border-gray-200 bg-white p-6">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Datos del CFDI</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <label htmlFor="invoice-type" className={labelClass}>Tipo de comprobante</label>
+            <select id="invoice-type" value={values.invoiceType} onChange={(event) => setFormValue('invoiceType', event.target.value)} className={inputClass}>
+              <option value="I">I - Ingreso</option>
+              <option value="E">E - Egreso</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="invoice-series" className={labelClass}>Serie</label>
+            <input id="invoice-series" value={values.series} onChange={(event) => setFormValue('series', event.target.value)} className={inputClass} placeholder="A" />
+          </div>
+          <div>
+            <label htmlFor="invoice-folio" className={labelClass}>Folio</label>
+            <input id="invoice-folio" value={values.folio} onChange={(event) => setFormValue('folio', event.target.value)} className={inputClass} placeholder="Se asigna automáticamente si lo dejas vacío" />
+          </div>
+          <div>
+            <label htmlFor="invoice-currency" className={labelClass}>Moneda</label>
+            <select id="invoice-currency" value={values.currencyCode} onChange={(event) => setFormValue('currencyCode', event.target.value)} className={inputClass}>
+              {monedaOptions.map((option) => (
+                <option key={option.code} value={option.code}>{option.code} - {option.description}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="invoice-payment-method" className={labelClass}>Método de pago</label>
+            <select id="invoice-payment-method" value={values.paymentMethodCode} onChange={(event) => setFormValue('paymentMethodCode', event.target.value)} className={inputClass}>
+              {metodoPagoOptions.map((option) => (
+                <option key={option.code} value={option.code}>{option.code} - {option.description}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="invoice-payment-form" className={labelClass}>Forma de pago</label>
+            <select id="invoice-payment-form" value={values.paymentFormCode} onChange={(event) => setFormValue('paymentFormCode', event.target.value)} className={inputClass}>
+              {formaPagoOptions.map((option) => (
+                <option key={option.code} value={option.code}>{option.code} - {option.description}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="invoice-uso-cfdi" className={labelClass}>Uso CFDI</label>
+            <select id="invoice-uso-cfdi" value={values.usoCfdiCode} onChange={(event) => setFormValue('usoCfdiCode', event.target.value)} className={inputClass}>
+              {usoCfdiOptions.map((option) => (
+                <option key={option.code} value={option.code}>{option.code} - {option.description}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Conceptos</h2>
+          <Button variant="secondary" size="sm" onClick={addLine}>
+            <Plus className="h-4 w-4" />
+            Agregar concepto
           </Button>
-          <Button variant="secondary" onClick={() => void validateDraft()}>
-            Validar
-          </Button>
-          <Button
-            onClick={() => {
-              const errors = validateDraft();
-              if (errors.length === 0) {
-                stampMutation.mutate(buildPayload());
-              }
+        </div>
+
+        {lineFields.map((field, index) => (
+          <InvoiceLineEditor
+            key={field.id}
+            index={index}
+            line={values.lines[index] ?? createEmptyInvoiceLine()}
+            localSummary={calculateLocalLineSummary(values.lines[index] ?? createEmptyInvoiceLine())}
+            selectedProduct={selectedProducts[field.id] ?? null}
+            errors={{
+              productId: errors.lines?.[index]?.productId?.message,
+              description: errors.lines?.[index]?.description?.message,
+              quantity: errors.lines?.[index]?.quantity?.message,
+              unitPrice: errors.lines?.[index]?.unitPrice?.message,
+              discount: errors.lines?.[index]?.discount?.message,
             }}
-            disabled={stampMutation.isPending}
-          >
+            onSelectProduct={(product) => handleProductSelect(field.id, index, product)}
+            onClearProduct={() => handleProductClear(field.id, index)}
+            onChange={(lineField, value) => setLineValue(index, lineField, value)}
+            onRemove={() => removeLine(index, field.id)}
+            canRemove={lineFields.length > 1}
+          />
+        ))}
+      </section>
+
+      <InvoiceSummaryCard localSummary={localSummary} validatedPreview={validationResult?.preview} />
+
+      {(validationResult?.issues?.length || generalError) ? (
+        <ValidationAlertList
+          issues={[
+            ...(generalError ? [{ message: generalError, code: 'GENERAL_ERROR' }] : []),
+            ...(validationResult?.issues ?? []),
+          ]}
+        />
+      ) : null}
+
+      <section className="rounded-lg border border-gray-200 bg-white p-6">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Acciones</h2>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <Button variant="secondary" onClick={onSaveDraft} disabled={isBusy}>
+            {draftMutation.isPending ? 'Guardando borrador...' : 'Guardar borrador'}
+          </Button>
+          <Button variant="secondary" onClick={onValidate} disabled={isBusy}>
+            {validateMutation.isPending ? 'Validando...' : 'Validar'}
+          </Button>
+          <Button onClick={onStamp} disabled={isBusy}>
             {stampMutation.isPending ? 'Timbrando...' : 'Timbrar'}
           </Button>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

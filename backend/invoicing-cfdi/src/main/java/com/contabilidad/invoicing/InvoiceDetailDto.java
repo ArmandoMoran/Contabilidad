@@ -1,0 +1,47 @@
+package com.contabilidad.invoicing;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+public record InvoiceDetailDto(
+    UUID id,
+    UUID companyId,
+    UUID clientId,
+    String invoiceType,
+    String status,
+    String series,
+    String folio,
+    String cfdiVersion,
+    Instant issuedAt,
+    Instant certifiedAt,
+    Instant cancelledAt,
+    String currencyCode,
+    BigDecimal exchangeRate,
+    String paymentMethodCode,
+    String paymentFormCode,
+    String usoCfdiCode,
+    String exportCode,
+    String issuerRfc,
+    String issuerName,
+    String issuerRegimeCode,
+    String receiverRfc,
+    String receiverName,
+    String receiverRegimeCode,
+    String receiverPostalCode,
+    BigDecimal subtotal,
+    BigDecimal discount,
+    BigDecimal transferredTaxTotal,
+    BigDecimal withheldTaxTotal,
+    BigDecimal total,
+    UUID pacUuid,
+    String pacCertNumber,
+    String satCertNumber,
+    String pacStatus,
+    String cancelReasonCode,
+    UUID cancelReplacementUuid,
+    List<InvoiceLineDto> lines,
+    List<TaxLineDto> taxLines,
+    List<InvoiceArtifactDto> artifacts
+) {}

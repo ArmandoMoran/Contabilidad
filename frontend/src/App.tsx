@@ -8,6 +8,7 @@ import { SuppliersPage } from './pages/suppliers/SuppliersPage';
 import { SupplierDetailPage } from './pages/suppliers/SupplierDetailPage';
 import { NewSupplierPage } from './pages/suppliers/NewSupplierPage';
 import { ProductsPage } from './pages/products/ProductsPage';
+import { InvoicesPage } from './pages/invoicing/InvoicesPage';
 import { NewInvoicePage } from './pages/invoicing/NewInvoicePage';
 import { InvoiceDetailPage } from './pages/invoicing/InvoiceDetailPage';
 import { ExpensesPage } from './pages/expenses/ExpensesPage';
@@ -38,6 +39,7 @@ export function App() {
         <Route path="/proveedores/nuevo" element={<NewSupplierPage />} />
         <Route path="/proveedores/:id" element={<SupplierDetailPage />} />
         <Route path="/productos" element={<ProductsPage />} />
+        <Route path="/facturacion" element={<InvoicesPage />} />
         <Route path="/facturacion/nueva" element={<NewInvoicePage />} />
         <Route path="/facturacion/:id" element={<InvoiceDetailPage />} />
         <Route path="/gastos" element={<ExpensesPage />} />

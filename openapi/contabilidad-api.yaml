@@ -405,9 +405,18 @@ paths:
         - $ref: '#/components/parameters/page'
         - $ref: '#/components/parameters/size'
         - $ref: '#/components/parameters/sort'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Búsqueda por nombre, código interno, descripción o clave SAT
       responses:
         '200':
           description: Lista de productos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPage'
     post:
       tags: [Products]
       summary: Crear producto
@@ -421,6 +430,10 @@ paths:
       responses:
         '201':
           description: Producto creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDto'
 
   /api/v1/products/{productId}:
     get:
@@ -437,6 +450,10 @@ paths:
       responses:
         '200':
           description: Producto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDto'
     patch:
       tags: [Products]
       summary: Actualizar producto
@@ -451,6 +468,10 @@ paths:
       responses:
         '200':
           description: Producto actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDto'
     delete:
       tags: [Products]
       summary: Eliminar producto
@@ -483,6 +504,7 @@ paths:
               - regimen-fiscal
               - uso-cfdi
               - forma-pago
+              - metodo-pago
               - clave-prod-serv
               - clave-unidad
               - objeto-imp
@@ -530,9 +552,37 @@ paths:
           schema:
             type: string
             enum: [DRAFT, VALIDATED, STAMPED, CANCELLED]
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Búsqueda por serie-folio, UUID, RFC o nombre del receptor
       responses:
         '200':
           description: Lista de facturas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoicePage'
+
+  /api/v1/invoices/validate:
+    post:
+      tags: [Invoices]
+      summary: Validar factura antes de guardar o timbrar
+      operationId: validateInvoiceDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceDraftRequest'
+      responses:
+        '200':
+          description: Resultado de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
 
   /api/v1/invoices/drafts:
     post:
@@ -548,6 +598,35 @@ paths:
       responses:
         '201':
           description: Borrador creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceSummary'
+
+  /api/v1/invoices/stamped:
+    post:
+      tags: [Invoices]
+      summary: Crear y timbrar factura en una sola operación
+      operationId: createStampedInvoice
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceDraftRequest'
+      responses:
+        '201':
+          description: Factura timbrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceSummary'
 
   /api/v1/invoices/{invoiceId}:
     get:
@@ -564,6 +643,10 @@ paths:
       responses:
         '200':
           description: Factura
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceDetail'
 
   /api/v1/invoices/{invoiceId}/validate:
     post:
@@ -599,16 +682,62 @@ paths:
             format: uuid
         - name: Idempotency-Key
           in: header
-          required: true
+          required: false
           schema:
             type: string
       responses:
         '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceSummary'
           description: Timbrado aceptado para proceso asíncrono
         '409':
           description: Documento ya timbrado o petición duplicada
         '422':
           description: Documento no fiscalmente válido
+
+  /api/v1/invoices/{invoiceId}/xml:
+    get:
+      tags: [Invoices]
+      summary: Descargar XML de la factura
+      operationId: downloadInvoiceXml
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: XML descargable
+          content:
+            application/xml:
+              schema:
+                type: string
+                format: binary
+
+  /api/v1/invoices/{invoiceId}/pdf:
+    get:
+      tags: [Invoices]
+      summary: Descargar PDF de la factura
+      operationId: downloadInvoicePdf
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: PDF descargable
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
 
   /api/v1/invoices/{invoiceId}/cancel:
     post:
@@ -630,33 +759,31 @@ paths:
               $ref: '#/components/schemas/CancelRequest'
       responses:
         '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceSummary'
           description: CFDI cancelado
         '422':
           description: No se puede cancelar
 
-  /api/v1/invoices/{invoiceId}/payment-complements:
-    post:
-      tags: [Invoices]
-      summary: Generar complemento de pago (REP 2.0)
-      operationId: createPaymentComplement
-      parameters:
-        - name: invoiceId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '201':
-          description: Complemento de pago generado
-
-  /api/v1/credit-notes:
+  /api/v1/invoices/credit-notes:
     post:
       tags: [Invoices]
       summary: Crear nota de crédito
       operationId: createCreditNote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceDraftRequest'
       responses:
         '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceSummary'
           description: Nota de crédito creada
 
   # ── Expenses ──
@@ -1329,6 +1456,93 @@ components:
         diotOperationType:
           type: string
 
+    ProductTaxProfileDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        taxCode:
+          type: string
+        factorType:
+          type: string
+        rate:
+          type: number
+          format: decimal
+        isTransfer:
+          type: boolean
+        isWithholding:
+          type: boolean
+        validFrom:
+          type: string
+          format: date
+        validTo:
+          type: string
+          format: date
+        active:
+          type: boolean
+
+    ProductDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        companyId:
+          type: string
+          format: uuid
+        internalCode:
+          type: string
+        internalName:
+          type: string
+        description:
+          type: string
+        satProductCode:
+          type: string
+        satUnitCode:
+          type: string
+        unitPrice:
+          type: number
+          format: decimal
+        currencyCode:
+          type: string
+        objetoImpCode:
+          type: string
+        cuentaPredial:
+          type: string
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        taxProfiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductTaxProfileDto'
+
+    ProductPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductDto'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalItems:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+
     CreateProductRequest:
       type: object
       required: [internalName, satProductCode, satUnitCode, unitPrice]
@@ -1379,7 +1593,7 @@ components:
     # ── Invoices ──
     CreateInvoiceDraftRequest:
       type: object
-      required: [clientId, invoiceType, paymentMethodCode, usoCfdiCode]
+      required: [clientId, invoiceType]
       properties:
         clientId:
           type: string
@@ -1387,6 +1601,10 @@ components:
         invoiceType:
           type: string
           enum: [I, E, T, P]
+        series:
+          type: string
+        folio:
+          type: string
         paymentMethodCode:
           type: string
           enum: [PUE, PPD]
@@ -1404,7 +1622,7 @@ components:
 
     InvoiceLineRequest:
       type: object
-      required: [description, quantity, unitPrice, satProductCode, satUnitCode]
+      required: [productId, quantity]
       properties:
         productId:
           type: string
@@ -1413,25 +1631,303 @@ components:
           type: string
         quantity:
           type: number
+          format: decimal
         unitPrice:
           type: number
+          format: decimal
+        discount:
+          type: number
+          format: decimal
+
+    InvoiceSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        companyId:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        invoiceType:
+          type: string
+        status:
+          type: string
+        series:
+          type: string
+        folio:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        currencyCode:
+          type: string
+        subtotal:
+          type: number
+          format: decimal
+        transferredTaxTotal:
+          type: number
+          format: decimal
+        withheldTaxTotal:
+          type: number
+          format: decimal
+        total:
+          type: number
+          format: decimal
+        pacUuid:
+          type: string
+          format: uuid
+        receiverRfc:
+          type: string
+        receiverName:
+          type: string
+
+    InvoicePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceSummary'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalItems:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+
+    InvoiceLineDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        lineNumber:
+          type: integer
+        productId:
+          type: string
+          format: uuid
         satProductCode:
+          type: string
+        description:
           type: string
         satUnitCode:
           type: string
-        taxProfileId:
+        unitName:
+          type: string
+        quantity:
+          type: number
+          format: decimal
+        unitPrice:
+          type: number
+          format: decimal
+        discount:
+          type: number
+          format: decimal
+        subtotal:
+          type: number
+          format: decimal
+        objetoImpCode:
+          type: string
+        transferredTaxTotal:
+          type: number
+          format: decimal
+        withheldTaxTotal:
+          type: number
+          format: decimal
+        total:
+          type: number
+          format: decimal
+
+    TaxLineDto:
+      type: object
+      properties:
+        id:
           type: string
           format: uuid
+        sourceType:
+          type: string
+        sourceId:
+          type: string
+          format: uuid
+        sourceLineId:
+          type: string
+          format: uuid
+        taxCode:
+          type: string
+        factorType:
+          type: string
+        rate:
+          type: number
+          format: decimal
+        baseAmount:
+          type: number
+          format: decimal
+        taxAmount:
+          type: number
+          format: decimal
+        isTransfer:
+          type: boolean
+        isWithholding:
+          type: boolean
+        periodKey:
+          type: string
+
+    InvoiceArtifact:
+      type: object
+      properties:
+        type:
+          type: string
+        fileName:
+          type: string
+        contentType:
+          type: string
+        downloadUrl:
+          type: string
+
+    InvoicePreview:
+      type: object
+      properties:
+        series:
+          type: string
+        folio:
+          type: string
+        currencyCode:
+          type: string
+        paymentMethodCode:
+          type: string
+        paymentFormCode:
+          type: string
+        usoCfdiCode:
+          type: string
+        issuerRfc:
+          type: string
+        issuerName:
+          type: string
+        issuerRegimeCode:
+          type: string
+        receiverRfc:
+          type: string
+        receiverName:
+          type: string
+        receiverRegimeCode:
+          type: string
+        receiverPostalCode:
+          type: string
+        subtotal:
+          type: number
+          format: decimal
+        discount:
+          type: number
+          format: decimal
+        transferredTaxTotal:
+          type: number
+          format: decimal
+        withheldTaxTotal:
+          type: number
+          format: decimal
+        total:
+          type: number
+          format: decimal
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLineDto'
+        taxLines:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaxLineDto'
+
+    InvoiceValidationIssue:
+      type: object
+      properties:
+        fieldPath:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+
+    InvoiceDetail:
+      allOf:
+        - $ref: '#/components/schemas/InvoiceSummary'
+        - type: object
+          properties:
+            cfdiVersion:
+              type: string
+            certifiedAt:
+              type: string
+              format: date-time
+            cancelledAt:
+              type: string
+              format: date-time
+            exchangeRate:
+              type: number
+              format: decimal
+            paymentMethodCode:
+              type: string
+            paymentFormCode:
+              type: string
+            usoCfdiCode:
+              type: string
+            exportCode:
+              type: string
+            issuerRfc:
+              type: string
+            issuerName:
+              type: string
+            issuerRegimeCode:
+              type: string
+            receiverRegimeCode:
+              type: string
+            receiverPostalCode:
+              type: string
+            discount:
+              type: number
+              format: decimal
+            pacCertNumber:
+              type: string
+            satCertNumber:
+              type: string
+            pacStatus:
+              type: string
+            cancelReasonCode:
+              type: string
+            cancelReplacementUuid:
+              type: string
+              format: uuid
+            lines:
+              type: array
+              items:
+                $ref: '#/components/schemas/InvoiceLineDto'
+            taxLines:
+              type: array
+              items:
+                $ref: '#/components/schemas/TaxLineDto'
+            artifacts:
+              type: array
+              items:
+                $ref: '#/components/schemas/InvoiceArtifact'
 
     ValidationResult:
       type: object
       properties:
-        valid:
-          type: boolean
-        errors:
+        issues:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/InvoiceValidationIssue'
+        valid:
+          type: boolean
+        preview:
+          $ref: '#/components/schemas/InvoicePreview'
 
     CancelRequest:
       type: object

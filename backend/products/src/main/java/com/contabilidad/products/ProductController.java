@@ -19,9 +19,11 @@ public class ProductController {
     }
 
     @GetMapping
-    public PageResponse<ProductDto> list(Pageable pageable) {
+    public PageResponse<ProductDto> list(
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
         var companyId = SecurityContextUtils.currentCompanyId();
-        Page<Product> page = productService.listProducts(companyId, pageable);
+        Page<Product> page = productService.listProducts(companyId, search, pageable);
         return PageResponse.of(
             page.getContent().stream().map(p -> ProductMapper.toDto(p, productService.getTaxProfiles(p.getId()))).toList(),
             page.getNumber(),

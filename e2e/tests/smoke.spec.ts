@@ -32,15 +32,36 @@ test.describe('Smoke E2E', () => {
     await expect(page).toHaveURL(/\/clientes\/[0-9a-f-]+$/);
   });
 
-  test('shows products and invoicing flows after login', async ({ page }) => {
+  test('creates, validates, saves, stamps and downloads an invoice', async ({ page }) => {
     await login(page);
 
-    await page.goto('/productos');
-    await expect(page.getByRole('heading', { name: 'Productos y Servicios' })).toBeVisible();
-
     await page.goto('/facturacion/nueva');
-    await expect(page.getByRole('heading', { name: 'Emisor' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Tu cliente' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Productos o servicios' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Generar factura' })).toBeVisible();
+
+    await page.getByLabel('Buscar cliente').fill('Distribuidora Norte');
+    await page.getByRole('button', { name: /Distribuidora Norte/i }).click();
+    await expect(page.getByLabel('Método de pago')).toHaveValue('PUE');
+
+    await page.getByLabel('Buscar producto').fill('Consultoría Fiscal');
+    await page.getByRole('button', { name: /Consultoría Fiscal|Consultoria Fiscal/i }).click();
+    await expect(page.getByLabel('Descripción')).toHaveValue(/consultor/i);
+
+    await page.getByRole('button', { name: 'Validar' }).click();
+    await expect(page.getByText('Totales validados')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Guardar borrador' }).click();
+    await expect(page).toHaveURL(/\/facturacion\/[0-9a-f-]+$/);
+    await expect(page.getByRole('heading', { name: /Factura/i })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Timbrar' }).click();
+    await expect(page.getByText('Timbrada')).toBeVisible();
+
+    const xmlDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Descargar XML' }).click();
+    await (await xmlDownload).path();
+
+    const pdfDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Descargar PDF' }).click();
+    await (await pdfDownload).path();
   });
 });

@@ -9,9 +9,11 @@ import java.util.UUID;
 public record CreateInvoiceDraftRequest(
     @NotNull UUID clientId,
     @NotBlank String invoiceType,
-    @NotBlank String paymentMethodCode,
+    String series,
+    String folio,
+    String paymentMethodCode,
     String paymentFormCode,
-    @NotBlank String usoCfdiCode,
+    String usoCfdiCode,
     String currencyCode,
     @Valid List<InvoiceLineRequest> lines
 ) {}

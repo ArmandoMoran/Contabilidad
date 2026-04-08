@@ -56,6 +56,20 @@ export interface Product {
   active: boolean;
 }
 
+export interface Company {
+  id: string;
+  rfc: string;
+  legalName: string;
+  taxpayerType: string;
+  fiscalRegimeCode: string;
+  taxZoneProfile: string;
+  postalCode?: string;
+  logoUrl?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Invoice {
   id: string;
   companyId: string;

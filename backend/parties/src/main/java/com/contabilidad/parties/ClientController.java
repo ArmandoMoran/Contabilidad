@@ -18,9 +18,11 @@ public class ClientController {
     }
 
     @GetMapping
-    public PageResponse<ClientDto> list(Pageable pageable) {
+    public PageResponse<ClientDto> list(
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
         var companyId = SecurityContextUtils.currentCompanyId();
-        Page<Client> page = clientService.listClients(companyId, pageable);
+        Page<Client> page = clientService.listClients(companyId, search, pageable);
         return PageResponse.of(
             page.getContent().stream().map(ClientMapper::toDto).toList(),
             page.getNumber(),

@@ -10,6 +10,8 @@ public class CatalogController {
     private final SatRegimenFiscalRepository regimenFiscalRepo;
     private final SatUsoCfdiRepository usoCfdiRepo;
     private final SatFormaPagoRepository formaPagoRepo;
+    private final SatMetodoPagoRepository metodoPagoRepo;
+    private final SatMonedaRepository monedaRepo;
     private final SatClaveProdServRepository claveProdServRepo;
     private final SatClaveUnidadRepository claveUnidadRepo;
     private final SatObjetoImpRepository objetoImpRepo;
@@ -21,6 +23,8 @@ public class CatalogController {
     public CatalogController(SatRegimenFiscalRepository regimenFiscalRepo,
                              SatUsoCfdiRepository usoCfdiRepo,
                              SatFormaPagoRepository formaPagoRepo,
+                             SatMetodoPagoRepository metodoPagoRepo,
+                             SatMonedaRepository monedaRepo,
                              SatClaveProdServRepository claveProdServRepo,
                              SatClaveUnidadRepository claveUnidadRepo,
                              SatObjetoImpRepository objetoImpRepo,
@@ -31,6 +35,8 @@ public class CatalogController {
         this.regimenFiscalRepo = regimenFiscalRepo;
         this.usoCfdiRepo = usoCfdiRepo;
         this.formaPagoRepo = formaPagoRepo;
+        this.metodoPagoRepo = metodoPagoRepo;
+        this.monedaRepo = monedaRepo;
         this.claveProdServRepo = claveProdServRepo;
         this.claveUnidadRepo = claveUnidadRepo;
         this.objetoImpRepo = objetoImpRepo;
@@ -46,6 +52,8 @@ public class CatalogController {
             case "regimen-fiscal" -> regimenFiscalRepo.findAllByActiveTrue();
             case "uso-cfdi" -> usoCfdiRepo.findAllByActiveTrue();
             case "forma-pago" -> formaPagoRepo.findAllByActiveTrue();
+            case "metodo-pago" -> metodoPagoRepo.findAllByActiveTrue();
+            case "moneda" -> monedaRepo.findAllByActiveTrue();
             case "clave-prod-serv" -> claveProdServRepo.findAllByActiveTrue();
             case "clave-unidad" -> claveUnidadRepo.findAllByActiveTrue();
             case "objeto-imp" -> objetoImpRepo.findAllByActiveTrue();

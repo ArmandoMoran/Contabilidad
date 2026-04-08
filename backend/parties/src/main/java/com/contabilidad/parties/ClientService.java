@@ -23,9 +23,12 @@ public class ClientService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Client> listClients(UUID companyId, Pageable pageable) {
-        log.info("Listing clients for companyId={}, page={}", companyId, pageable);
-        Page<Client> page = clientRepository.findByCompanyIdAndDeletedAtIsNull(companyId, pageable);
+    public Page<Client> listClients(UUID companyId, String search, Pageable pageable) {
+        log.info("Listing clients for companyId={}, search={}, page={}", companyId, search, pageable);
+        String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+        Page<Client> page = normalizedSearch == null
+            ? clientRepository.findByCompanyIdAndDeletedAtIsNull(companyId, pageable)
+            : clientRepository.searchByCompanyId(companyId, normalizedSearch, pageable);
         log.debug("Found {} clients (total={})", page.getNumberOfElements(), page.getTotalElements());
         return page;
     }

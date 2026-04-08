@@ -59,11 +59,10 @@ class FiscalWorkflowApiIT extends AbstractApiIntegrationTest {
             "usoCfdiCode", "G03",
             "currencyCode", "MXN",
             "lines", List.of(Map.of(
+                "productId", "55555555-5555-7555-8555-555555555501",
                 "description", "Bonificacion comercial",
                 "quantity", 1,
-                "unitPrice", 1000,
-                "satProductCode", "84111506",
-                "satUnitCode", "ACT"
+                "unitPrice", 1000
             ))
         ), accessToken);
 
